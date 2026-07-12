@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from awesomeversion import AwesomeVersion
+
 from supervisor.const import OBSERVER_PORT
 from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
@@ -56,8 +58,8 @@ async def test_k8s_audio_dns_noop_behaviour(
     await plugin.run()
     await plugin.stop()
     await plugin.restart()
-    await plugin.install(version="2026.1.0")
-    await plugin.update(version="2026.1.1")
+    await plugin.install(version=AwesomeVersion("2026.1.0"))
+    await plugin.update(version=AwesomeVersion("2026.1.1"))
 
     assert plugin.image is None
     assert await plugin.exists() is True
