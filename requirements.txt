@@ -1,4 +1,5 @@
 aiodns==4.0.4
+kubernetes-asyncio==36.1.0
 aiodocker==0.27.0
 aiohttp==3.14.1
 atomicwrites-homeassistant==1.4.1
