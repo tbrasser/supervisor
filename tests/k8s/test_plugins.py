@@ -2,9 +2,8 @@
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from awesomeversion import AwesomeVersion
+import pytest
 
 from supervisor.const import OBSERVER_PORT
 from supervisor.coresys import CoreSys
