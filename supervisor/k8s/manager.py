@@ -36,17 +36,10 @@ from kubernetes_asyncio.stream import WsApiClient
 from ..coresys import CoreSys, CoreSysAttributes
 from ..docker.manager import CommandReturn, ExecReturn
 from .const import (
-    API_VERSION_APPS,
-    API_VERSION_CORE,
     DEFAULT_TERMINATION_GRACE_PERIOD,
-    IMAGE_PULL_POLICY,
     K8S_NAMESPACE,
-    KIND_DEPLOYMENT,
-    KIND_JOB,
-    KIND_SERVICE,
     LABEL_APP,
     LABEL_MANAGED,
-    RESTART_POLICY_NEVER,
 )
 from .exceptions import K8sAPIError, K8sNotFound, K8sTimeoutError
 from .monitor import K8sMonitor
@@ -177,7 +170,7 @@ class K8sAPI(CoreSysAttributes):
             if err.status == 404:
                 _LOGGER.info("Creating Kubernetes namespace '%s'", K8S_NAMESPACE)
                 namespace = client.V1Namespace(
-                    api_version=API_VERSION_CORE,
+                    api_version="v1",
                     kind="Namespace",
                     metadata=client.V1ObjectMeta(
                         name=K8S_NAMESPACE,
@@ -267,7 +260,7 @@ class K8sAPI(CoreSysAttributes):
         container: dict[str, Any] = {
             "name": name,
             "image": f"{image}:{tag}",
-            "imagePullPolicy": IMAGE_PULL_POLICY,
+            "imagePullPolicy": "IfNotPresent",
         }
         if env_list:
             container["env"] = env_list
@@ -293,8 +286,8 @@ class K8sAPI(CoreSysAttributes):
             pod_spec.update(extra_pod_spec)
 
         manifest: dict[str, Any] = {
-            "apiVersion": API_VERSION_APPS,
-            "kind": KIND_DEPLOYMENT,
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
             "metadata": {
                 "name": name,
                 "namespace": K8S_NAMESPACE,
@@ -567,7 +560,7 @@ class K8sAPI(CoreSysAttributes):
         labels = {LABEL_MANAGED: "true", LABEL_APP: job_name}
         job_manifest: dict[str, Any] = {
             "apiVersion": "batch/v1",
-            "kind": KIND_JOB,
+            "kind": "Job",
             "metadata": {
                 "name": job_name,
                 "namespace": K8S_NAMESPACE,
@@ -578,12 +571,12 @@ class K8sAPI(CoreSysAttributes):
                 "template": {
                     "metadata": {"labels": labels},
                     "spec": {
-                        "restartPolicy": RESTART_POLICY_NEVER,
+                        "restartPolicy": "Never",
                         "containers": [
                             {
                                 "name": "cmd",
                                 "image": f"{image}:{tag}",
-                                "imagePullPolicy": IMAGE_PULL_POLICY,
+                                "imagePullPolicy": "IfNotPresent",
                                 "command": command,
                             }
                         ],
@@ -692,8 +685,8 @@ class K8sAPI(CoreSysAttributes):
         """
         labels = {LABEL_MANAGED: "true", LABEL_APP: name}
         svc_manifest: dict[str, Any] = {
-            "apiVersion": API_VERSION_CORE,
-            "kind": KIND_SERVICE,
+            "apiVersion": "v1",
+            "kind": "Service",
             "metadata": {
                 "name": name,
                 "namespace": K8S_NAMESPACE,
