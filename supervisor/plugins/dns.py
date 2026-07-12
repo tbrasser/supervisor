@@ -22,6 +22,7 @@ from ..docker.const import ContainerState
 from ..docker.dns import DockerDNS
 from ..docker.monitor import DockerContainerStateEvent
 from ..docker.stats import DockerStats
+from ..k8s.dns import K8sDns
 from ..exceptions import (
     ConfigurationFileError,
     CoreDNSError,
@@ -71,7 +72,9 @@ class PluginDns(PluginBase):
         super().__init__(FILE_HASSIO_DNS, SCHEMA_DNS_CONFIG)
         self.slug = "dns"
         self.coresys: CoreSys = coresys
-        self.instance: DockerDNS = DockerDNS(coresys)
+        self.instance: DockerDNS | K8sDns = (
+            K8sDns(coresys) if coresys.k8s else DockerDNS(coresys)
+        )
         self._resolv_template: jinja2.Template | None = None
         self._hosts_template: jinja2.Template | None = None
 

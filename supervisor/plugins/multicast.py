@@ -11,6 +11,7 @@ from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.multicast import DockerMulticast
 from ..docker.stats import DockerStats
+from ..k8s.multicast import K8sMulticast
 from ..exceptions import (
     DockerError,
     MulticastError,
@@ -41,7 +42,9 @@ class PluginMulticast(PluginBase):
         super().__init__(FILE_HASSIO_MULTICAST, SCHEMA_MULTICAST_CONFIG)
         self.slug = "multicast"
         self.coresys: CoreSys = coresys
-        self.instance: DockerMulticast = DockerMulticast(coresys)
+        self.instance: DockerMulticast | K8sMulticast = (
+            K8sMulticast(coresys) if coresys.k8s else DockerMulticast(coresys)
+        )
 
     @property
     def default_image(self) -> str:
