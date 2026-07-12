@@ -13,6 +13,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 CLI_K8S_NAME: str = CLI_DOCKER_NAME
 
+
 class K8sCli(K8sInterface):
     """Kubernetes Supervisor wrapper for HA cli."""
 
