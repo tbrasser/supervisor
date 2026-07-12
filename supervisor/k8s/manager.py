@@ -664,12 +664,25 @@ class K8sAPI(CoreSysAttributes):
     # Service management
     # ------------------------------------------------------------------
 
+    async def get_service(self, name: str) -> dict[str, Any] | None:
+        """Return the Service manifest or ``None`` if it does not exist."""
+        try:
+            result = await self.core_v1.read_namespaced_service(name, K8S_NAMESPACE)
+            return result.to_dict()
+        except client.ApiException as err:
+            if err.status == 404:
+                return None
+            raise K8sAPIError(
+                f"Failed to get Service '{name}': {err}", _LOGGER.error
+            ) from err
+
     async def apply_service(
         self,
         name: str,
         ports: list[dict[str, Any]],
         *,
         service_type: str = "ClusterIP",
+        selector: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Create or update a Kubernetes Service for workload *name*.
 
@@ -681,6 +694,12 @@ class K8sAPI(CoreSysAttributes):
             List of ``{"port": int, "targetPort": int, "protocol": str}`` dicts.
         service_type:
             Kubernetes service type (``ClusterIP``, ``NodePort``, ``LoadBalancer``).
+        selector:
+            Pod label selector for the Service.  Defaults to
+            ``{LABEL_APP: name}`` when ``None``, which is appropriate for
+            services that front their own Deployment.  Pass an explicit
+            selector when the Service should route to a *different*
+            workload (e.g. the Observer Service routing to HA Core).
 
         """
         labels = {LABEL_MANAGED: "true", LABEL_APP: name}
@@ -693,7 +712,7 @@ class K8sAPI(CoreSysAttributes):
                 "labels": labels,
             },
             "spec": {
-                "selector": {LABEL_APP: name},
+                "selector": selector or {LABEL_APP: name},
                 "ports": ports,
                 "type": service_type,
             },

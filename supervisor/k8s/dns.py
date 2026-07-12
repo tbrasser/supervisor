@@ -1,14 +1,30 @@
-"""Kubernetes workload definition for HA DNS plugin."""
+"""Kubernetes DNS: delegates to Kubernetes native CoreDNS.
+
+Version 1 – any K8s cluster, single namespace
+  DNS resolution within the ``home-assistant`` namespace is handled
+  transparently by the cluster's built-in CoreDNS.  Services are
+  reachable at ``<name>.<namespace>.svc.cluster.local`` without any
+  additional plugin container.  No HA DNS container is deployed.
+
+Version 2 – haos-kairos (future)
+  Custom CoreDNS ConfigMap patches can be applied here to propagate
+  host-level mDNS / LLMNR entries into the cluster-wide DNS.
+"""
+
+from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Awaitable
+
+from awesomeversion import AwesomeVersion
 
 from ..const import DNS_DOCKER_NAME
-from ..docker.const import ENV_TIME
+from ..docker.const import ContainerState
 from ..exceptions import DockerJobError
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
 from .interface import K8sInterface
+from .stats import K8sStats
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -16,7 +32,11 @@ DNS_K8S_NAME: str = DNS_DOCKER_NAME
 
 
 class K8sDns(K8sInterface):
-    """Kubernetes Supervisor wrapper for HA DNS plugin."""
+    """K8s DNS: no-op — Kubernetes CoreDNS handles all DNS natively (V1).
+
+    No DNS plugin container is deployed.  Internal service discovery and
+    external DNS forwarding are both provided by the cluster's CoreDNS.
+    """
 
     @property
     def name(self) -> str:
@@ -24,14 +44,13 @@ class K8sDns(K8sInterface):
         return DNS_K8S_NAME
 
     @property
-    def image(self) -> str:
-        """Return name of HA DNS image."""
-        return self.sys_plugins.dns.image
+    def image(self) -> str | None:
+        """No container image – DNS is handled by Kubernetes CoreDNS."""
+        return None
 
-    @property
-    def version(self) -> str | None:
-        """Return version of HA DNS image."""
-        return self.sys_plugins.dns.version
+    # ------------------------------------------------------------------
+    # Lifecycle (all no-ops)
+    # ------------------------------------------------------------------
 
     @Job(
         name="k8s_dns_run",
@@ -39,36 +58,87 @@ class K8sDns(K8sInterface):
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:
-        """Run Kubernetes workload for DNS plugin."""
-        version = self.sys_plugins.dns.version
-
-        # Mount the DNS config directory so CoreDNS can read its configuration.
-        volume_mounts: list[dict[str, Any]] = [
-            {
-                "name": "dns-config",
-                "mountPath": "/config",
-                "readOnly": False,
-            },
-        ]
-        volumes: list[dict[str, Any]] = [
-            {
-                "name": "dns-config",
-                "hostPath": {
-                    "path": self.sys_config.path_extern_dns.as_posix(),
-                    "type": "DirectoryOrCreate",
-                },
-            },
-        ]
-
-        await self._run(
-            image=self.image,
-            tag=str(version),
-            env={ENV_TIME: self.sys_timezone},
-            mounts=volume_mounts,
-            extra_pod_spec={"volumes": volumes},
-        )
+        """No-op: cluster CoreDNS is always available."""
         _LOGGER.info(
-            "Starting DNS %s with version %s in Kubernetes",
-            self.image,
-            version,
+            "K8s DNS (V1): cluster-internal DNS handled by Kubernetes CoreDNS; "
+            "no plugin container deployed"
         )
+
+    @Job(
+        name="k8s_dns_stop",
+        on_condition=DockerJobError,
+        concurrency=JobConcurrency.GROUP_REJECT,
+    )
+    async def stop(self, remove: bool = True) -> None:
+        """No-op: nothing to stop."""
+
+    @Job(
+        name="k8s_dns_start",
+        on_condition=DockerJobError,
+        concurrency=JobConcurrency.GROUP_REJECT,
+    )
+    def start(self) -> Awaitable[None]:
+        """No-op: DNS is always running."""
+        return self.run()
+
+    @Job(
+        name="k8s_dns_restart",
+        on_condition=DockerJobError,
+        concurrency=JobConcurrency.GROUP_REJECT,
+    )
+    async def restart(self) -> None:
+        """No-op: nothing to restart."""
+
+    @Job(
+        name="k8s_dns_install",
+        on_condition=DockerJobError,
+        concurrency=JobConcurrency.GROUP_REJECT,
+    )
+    async def install(
+        self,
+        version: AwesomeVersion,
+        image: str | None = None,
+        latest: bool = False,
+    ) -> None:
+        """No-op: no container to install."""
+
+    @Job(
+        name="k8s_dns_update",
+        on_condition=DockerJobError,
+        concurrency=JobConcurrency.GROUP_REJECT,
+    )
+    async def update(
+        self,
+        version: AwesomeVersion,
+        image: str | None = None,
+        latest: bool = False,
+    ) -> None:
+        """No-op: no container image to update."""
+
+    # ------------------------------------------------------------------
+    # State queries
+    # ------------------------------------------------------------------
+
+    async def is_running(self) -> bool:
+        """Return True – Kubernetes CoreDNS is always available."""
+        return True
+
+    async def current_state(self) -> ContainerState:
+        """Return RUNNING – Kubernetes CoreDNS is always available."""
+        return ContainerState.RUNNING
+
+    async def exists(self) -> bool:
+        """Return True – Kubernetes DNS always exists."""
+        return True
+
+    # ------------------------------------------------------------------
+    # Stats / logs
+    # ------------------------------------------------------------------
+
+    async def stats(self) -> K8sStats:
+        """No container – return empty stats."""
+        return K8sStats({})
+
+    async def logs(self) -> list[str]:
+        """No container – return empty log list."""
+        return []

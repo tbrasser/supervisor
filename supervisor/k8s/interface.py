@@ -247,6 +247,10 @@ class K8sInterface(JobGroup, ABC):
     # State queries
     # ------------------------------------------------------------------
 
+    async def exists(self) -> bool:
+        """Return ``True`` if the Deployment exists in the cluster."""
+        return await self.k8s.get_deployment(self.name) is not None
+
     async def is_running(self) -> bool:
         """Return ``True`` if at least one Pod is in the Running phase."""
         pods = await self.k8s.get_pods_for_deployment(self.name)
