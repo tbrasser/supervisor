@@ -25,10 +25,9 @@ import asyncio
 import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import hashlib
 import logging
-import time as _time
 from typing import Any, Self
+from uuid import uuid4
 
 from kubernetes_asyncio import client, config as k8s_config
 from kubernetes_asyncio.client import ApiClient
@@ -563,10 +562,7 @@ class K8sAPI(CoreSysAttributes):
         The Job is deleted after the command completes regardless of success or
         failure.
         """
-        job_suffix = hashlib.sha1(
-            f"{image}:{tag}:{' '.join(command)}:{_time.monotonic()}".encode()
-        ).hexdigest()[:8]
-        job_name = f"supervisor-cmd-{job_suffix}"
+        job_name = f"supervisor-cmd-{uuid4().hex[:8]}"
 
         labels = {LABEL_MANAGED: "true", LABEL_APP: job_name}
         job_manifest: dict[str, Any] = {

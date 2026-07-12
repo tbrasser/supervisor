@@ -301,7 +301,7 @@ class K8sInterface(JobGroup, ABC):
         on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
-    async def execute_command(self, command: str) -> CommandReturn:
+    async def execute_command(self, command: list[str]) -> CommandReturn:
         """Execute *command* inside the running Pod and return its output."""
         raise NotImplementedError
 
