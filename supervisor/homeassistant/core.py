@@ -20,6 +20,7 @@ from ..const import ATTR_HOMEASSISTANT, BusEvent, CoreState
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.homeassistant import HASS_DOCKER_NAME, DockerHomeAssistant
+from ..k8s.homeassistant import HASS_K8S_NAME, K8sHomeAssistant
 from ..docker.monitor import DockerContainerStateEvent
 from ..docker.stats import DockerStats
 from ..exceptions import (
@@ -79,7 +80,9 @@ class HomeAssistantCore(JobGroup):
     def __init__(self, coresys: CoreSys):
         """Initialize Home Assistant object."""
         super().__init__(coresys, JOB_GROUP_HOME_ASSISTANT_CORE)
-        self.instance: DockerHomeAssistant = DockerHomeAssistant(coresys)
+        self.instance: DockerHomeAssistant | K8sHomeAssistant = (
+            K8sHomeAssistant(coresys) if coresys.k8s else DockerHomeAssistant(coresys)
+        )
         self._error_state: bool = False
         self._watchdog_listener: EventListener | None = None
 

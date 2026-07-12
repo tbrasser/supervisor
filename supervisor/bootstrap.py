@@ -31,6 +31,7 @@ from .coresys import CoreSys
 from .dbus.manager import DBusManager
 from .discovery import Discovery
 from .docker.manager import DockerAPI
+from .k8s.manager import K8sAPI
 from .hardware.manager import HardwareManager
 from .homeassistant.module import HomeAssistant
 from .host.manager import HostManager
@@ -67,6 +68,11 @@ async def initialize_coresys() -> CoreSys:
 
     # Initialize core objects
     coresys.docker = await DockerAPI(coresys).post_init()
+    try:
+        coresys.k8s = await K8sAPI(coresys).post_init()
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        _LOGGER.debug("Kubernetes backend not available: %s", err)
+        coresys.k8s = None
     coresys.resolution = await ResolutionManager(coresys).load_config()
     await coresys.resolution.load_modules()
     coresys.jobs = await JobManager(coresys).load_config()
