@@ -35,6 +35,16 @@ from .stats import K8sStats
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+def _image_repository(image: str) -> str:
+    """Return the repository part of an image reference (strip the tag).
+
+    Only a colon after the last slash is a tag separator; this keeps registry
+    host ports (e.g. ``registry:5000/image``) intact.
+    """
+    prefix, slash, remainder = image.rpartition("/")
+    return prefix + slash + remainder.partition(":")[0]
+
+
 class K8sInterface(JobGroup, ABC):
     """Abstract Kubernetes workload interface.
 
@@ -311,6 +321,10 @@ class K8sInterface(JobGroup, ABC):
             skip_state_event_if_down
             and state in [ContainerState.STOPPED, ContainerState.FAILED]
         ):
+            # Kubernetes has no stable container ID equivalent for a
+            # Deployment; the workload name is used for both the event name
+            # and id fields, which is sufficient for bus consumers that key
+            # events by name.
             self.sys_bus.fire_event(
                 BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
                 DockerContainerStateEvent(self.name, state, self.name, int(time())),
@@ -339,7 +353,7 @@ class K8sInterface(JobGroup, ABC):
             .get("containers", [])
         )
         current_image = containers[0].get("image", "") if containers else ""
-        if current_image.rsplit(":", 1)[0] == expected_image:
+        if _image_repository(current_image) == expected_image:
             return
 
         _LOGGER.info(

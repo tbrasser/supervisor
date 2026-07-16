@@ -682,6 +682,8 @@ class K8sAPI(CoreSysAttributes):
         if not service:
             return None
         spec = service.get("spec") or {}
+        # kubernetes_asyncio model to_dict() emits snake_case keys, while raw
+        # manifests use camelCase - accept both.
         return spec.get("clusterIP") or spec.get("cluster_ip")
 
     async def apply_service(

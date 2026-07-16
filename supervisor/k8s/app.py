@@ -60,6 +60,7 @@ from ..docker.const import (
 from ..exceptions import (
     AppNotSupportedError,
     AppNotSupportedWriteStdinError,
+    CoreDNSError,
     DockerJobError,
 )
 from ..jobs.const import JobConcurrency
@@ -394,6 +395,9 @@ class K8sApp(K8sInterface):
         try:
             self._cluster_ip = IPv4Address(cluster_ip) if cluster_ip else NO_ADDRESS
         except ValueError:
+            _LOGGER.warning(
+                "Service '%s' returned invalid ClusterIP '%s'", self.name, cluster_ip
+            )
             self._cluster_ip = NO_ADDRESS
 
     # ------------------------------------------------------------------
@@ -444,8 +448,8 @@ class K8sApp(K8sInterface):
                 await self.sys_plugins.dns.add_host(
                     ipv4=self._cluster_ip, names=[self.app.hostname]
                 )
-            except Exception:  # pylint: disable=broad-exception-caught
-                _LOGGER.debug("Can't update DNS for %s", self.name)
+            except CoreDNSError as err:
+                _LOGGER.warning("Can't update DNS for %s: %s", self.name, err)
 
     async def attach(
         self, version: AwesomeVersion, *, skip_state_event_if_down: bool = False
