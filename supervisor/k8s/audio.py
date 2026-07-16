@@ -20,8 +20,8 @@ Version 2 – haos-kairos (future)
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Awaitable
+import logging
 
 from awesomeversion import AwesomeVersion
 

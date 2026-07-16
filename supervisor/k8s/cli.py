@@ -40,7 +40,7 @@ class K8sCli(K8sInterface):
     async def run(self) -> None:
         """Run Kubernetes workload."""
         version = self.sys_plugins.cli.version
-        
+
         await self._run(
             image=self.image,
             tag=str(version),
