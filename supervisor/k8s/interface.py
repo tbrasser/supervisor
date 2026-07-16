@@ -16,12 +16,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 import contextlib
 import logging
+from time import time
 
 from awesomeversion import AwesomeVersion
 
+from ..const import BusEvent, CpuArch
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.manager import CommandReturn, ExecReturn
+from ..docker.monitor import DockerContainerStateEvent
 from ..jobs.const import JOB_GROUP_DOCKER_INTERFACE, JobConcurrency
 from ..jobs.decorator import Job
 from ..jobs.job_group import JobGroup
@@ -30,6 +33,16 @@ from .manager import K8sAPI
 from .stats import K8sStats
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def _image_repository(image: str) -> str:
+    """Return the repository part of an image reference (strip the tag).
+
+    Only a colon after the last slash is a tag separator; this keeps registry
+    host ports (e.g. ``registry:5000/image``) intact.
+    """
+    prefix, slash, remainder = image.rpartition("/")
+    return prefix + slash + remainder.partition(":")[0]
 
 
 class K8sInterface(JobGroup, ABC):
@@ -47,6 +60,7 @@ class K8sInterface(JobGroup, ABC):
             self.name,
         )
         self.coresys: CoreSys = coresys
+        self._attached: bool = False
 
     # ------------------------------------------------------------------
     # Properties to override
@@ -71,6 +85,34 @@ class K8sInterface(JobGroup, ABC):
     def version(self) -> AwesomeVersion | None:
         """Return the current image version from the Deployment annotation."""
         # Synchronous read is not possible here; version is cached by callers.
+        return None
+
+    @property
+    def arch(self) -> str | None:
+        """Return the CPU architecture of the workload image.
+
+        Kubernetes pulls multi-arch images natively for the node architecture,
+        so the Supervisor default architecture is reported.
+        """
+        return str(self.sys_arch.default)
+
+    @property
+    def attached(self) -> bool:
+        """Return ``True`` if this interface is attached to a workload."""
+        return self._attached
+
+    @property
+    def in_progress(self) -> bool:
+        """Return True if a task is in progress."""
+        return self.active_job is not None
+
+    @property
+    def healthcheck(self) -> dict | None:
+        """Return the image healthcheck configuration.
+
+        Kubernetes uses readiness/liveness probes instead of Docker
+        healthchecks, so there is no image-level healthcheck to report.
+        """
         return None
 
     # ------------------------------------------------------------------
@@ -133,9 +175,10 @@ class K8sInterface(JobGroup, ABC):
             return
 
         # Remove any existing stopped workload first.
-        await self.stop(remove=False)
+        await self.stop(remove_container=False)
 
         await self.k8s.apply_deployment(self.name, use_image, use_tag, **kwargs)
+        self._attached = True
         _LOGGER.info(
             "Applied Deployment '%s' with image %s:%s", self.name, use_image, use_tag
         )
@@ -145,13 +188,15 @@ class K8sInterface(JobGroup, ABC):
         on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
-    async def stop(self, remove: bool = True) -> None:
+    async def stop(self, remove_container: bool = True) -> None:
         """Stop (and optionally delete) the Deployment for this workload.
 
-        When *remove* is ``False`` the Deployment is scaled to 0 instead of
-        being deleted, which preserves the spec for a future :meth:`start`.
+        When *remove_container* is ``False`` the Deployment is scaled to 0
+        instead of being deleted, which preserves the spec for a future
+        :meth:`start`.  The parameter name matches
+        :meth:`DockerInterface.stop` for API compatibility.
         """
-        if remove:
+        if remove_container:
             try:
                 await self.k8s.delete_deployment(self.name)
                 await self.k8s.delete_service(self.name)
@@ -184,8 +229,13 @@ class K8sInterface(JobGroup, ABC):
         on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
-    async def remove(self) -> None:
-        """Delete the Deployment and its associated Service."""
+    async def remove(self, *, remove_image: bool = True) -> None:
+        """Delete the Deployment and its associated Service.
+
+        The *remove_image* parameter is accepted for API compatibility with
+        the Docker backend but ignored (images live in the registry).
+        """
+        self._attached = False
         with contextlib.suppress(K8sNotFound):
             await self.k8s.delete_deployment(self.name)
         with contextlib.suppress(K8sNotFound):
@@ -201,12 +251,14 @@ class K8sInterface(JobGroup, ABC):
         version: AwesomeVersion,
         image: str | None = None,
         latest: bool = False,
+        arch: CpuArch | None = None,
     ) -> None:
         """Update the Deployment to a new image version.
 
         Stops the current workload and re-applies with the new image tag.
-        The *latest* parameter is accepted for API compatibility but ignored
-        (Kubernetes image tags are always explicit).
+        The *latest* and *arch* parameters are accepted for API compatibility
+        but ignored (Kubernetes pulls the node architecture natively and
+        image tags are always explicit).
         """
         use_image = image or self.image
         _LOGGER.info(
@@ -228,12 +280,14 @@ class K8sInterface(JobGroup, ABC):
         version: AwesomeVersion,
         image: str | None = None,
         latest: bool = False,
+        arch: CpuArch | None = None,
     ) -> None:
         """Install (first-time deploy) a workload.
 
         In the Kubernetes backend "installing" means applying the Deployment
         so Kubernetes can pull and start the image.  There is no separate image
-        pull step.
+        pull step.  The *latest* and *arch* parameters are accepted for API
+        compatibility but ignored.
         """
         use_image = image or self.image
         if not use_image:
@@ -242,10 +296,73 @@ class K8sInterface(JobGroup, ABC):
             "Installing workload '%s' with image %s:%s", self.name, use_image, version
         )
         await self.k8s.apply_deployment(self.name, use_image, str(version))
+        self._attached = True
 
     # ------------------------------------------------------------------
     # State queries
     # ------------------------------------------------------------------
+
+    async def attach(
+        self, version: AwesomeVersion, *, skip_state_event_if_down: bool = False
+    ) -> None:
+        """Attach to an existing Deployment for this workload.
+
+        Mirrors :meth:`DockerInterface.attach`: looks up the existing
+        workload, marks the interface as attached and fires a container
+        state event reflecting the current state.
+        """
+        deployment = await self.k8s.get_deployment(self.name)
+        if deployment is None:
+            raise K8sNotFound(f"Deployment '{self.name}' does not exist", _LOGGER.info)
+        self._attached = True
+
+        state = await self.current_state()
+        if not (
+            skip_state_event_if_down
+            and state in [ContainerState.STOPPED, ContainerState.FAILED]
+        ):
+            # Kubernetes has no stable container ID equivalent for a
+            # Deployment; the workload name is used for both the event name
+            # and id fields, which is sufficient for bus consumers that key
+            # events by name.
+            self.sys_bus.fire_event(
+                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
+                DockerContainerStateEvent(self.name, state, self.name, int(time())),
+            )
+
+    async def check_image(
+        self,
+        version: AwesomeVersion,
+        expected_image: str,
+        expected_cpu_arch: CpuArch | None = None,
+    ) -> None:
+        """Check the workload uses the expected image.
+
+        Kubernetes pulls images from the registry per Pod, so there is no
+        local image to inspect. If the Deployment references a different
+        image the workload is re-applied with the expected one.
+        """
+        deployment = await self.k8s.get_deployment(self.name)
+        if deployment is None:
+            return
+
+        containers = (
+            deployment.get("spec", {})
+            .get("template", {})
+            .get("spec", {})
+            .get("containers", [])
+        )
+        current_image = containers[0].get("image", "") if containers else ""
+        if _image_repository(current_image) == expected_image:
+            return
+
+        _LOGGER.info(
+            "Deployment '%s' uses image %s, expected %s. Re-applying.",
+            self.name,
+            current_image,
+            expected_image,
+        )
+        await self.install(version, expected_image)
 
     async def exists(self) -> bool:
         """Return ``True`` if the Deployment exists in the cluster."""

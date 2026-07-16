@@ -113,6 +113,7 @@ from ..exceptions import (
     PwnedError,
     PwnedSecret,
 )
+from ..k8s.stats import K8sStats
 from ..validate import docker_ports
 from .const import ATTR_BOOT_CONFIG, ATTR_REMOVE_CONFIG, ATTR_SIGNED
 from .utils import api_process, api_validate, json_loads
@@ -449,7 +450,7 @@ class APIApps(CoreSysAttributes):
         """Return resource information."""
         app = self.get_app_for_request(request)
 
-        stats: DockerStats = await app.stats()
+        stats: DockerStats | K8sStats = await app.stats()
 
         return {
             ATTR_CPU_PERCENT: stats.cpu_percent,

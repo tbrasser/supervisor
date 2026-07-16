@@ -676,6 +676,16 @@ class K8sAPI(CoreSysAttributes):
                 f"Failed to get Service '{name}': {err}", _LOGGER.error
             ) from err
 
+    async def get_service_cluster_ip(self, name: str) -> str | None:
+        """Return the ClusterIP of a Service or ``None`` if unavailable."""
+        service = await self.get_service(name)
+        if not service:
+            return None
+        spec = service.get("spec") or {}
+        # kubernetes_asyncio model to_dict() emits snake_case keys, while raw
+        # manifests use camelCase - accept both.
+        return spec.get("clusterIP") or spec.get("cluster_ip")
+
     async def apply_service(
         self,
         name: str,

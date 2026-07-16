@@ -13,9 +13,9 @@ Version 2 – haos-kairos (future)
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 import contextlib
 import logging
-from collections.abc import Awaitable
 from typing import Any
 
 from awesomeversion import AwesomeVersion
