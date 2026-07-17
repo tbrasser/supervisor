@@ -12,6 +12,7 @@ from awesomeversion import AwesomeVersion
 from ..const import ATTR_ACCESS_TOKEN
 from ..coresys import CoreSys
 from ..docker.cli import DockerCli
+from ..k8s.cli import K8sCli
 from ..docker.const import ContainerState
 from ..docker.stats import DockerStats
 from ..exceptions import CliError, CliJobError, CliUpdateError, DockerError, PluginError
@@ -38,7 +39,9 @@ class PluginCli(PluginBase):
         super().__init__(FILE_HASSIO_CLI, SCHEMA_CLI_CONFIG)
         self.slug = "cli"
         self.coresys: CoreSys = coresys
-        self.instance: DockerCli = DockerCli(coresys)
+        self.instance: DockerCli | K8sCli = (
+            K8sCli(coresys) if coresys.k8s else DockerCli(coresys)
+        )
 
     @property
     def default_image(self) -> str:

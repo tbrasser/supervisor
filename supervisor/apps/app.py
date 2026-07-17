@@ -91,6 +91,8 @@ from ..hardware.data import Device
 from ..homeassistant.const import WSEvent
 from ..jobs.const import JobConcurrency, JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.app import K8sApp
+from ..k8s.stats import K8sStats
 from ..resolution.const import ContextType, IssueType, SuggestionType
 from ..resolution.data import Issue
 from ..store.app import AppStore
@@ -148,7 +150,9 @@ class App(AppModel):
     def __init__(self, coresys: CoreSys, slug: str):
         """Initialize data holder."""
         super().__init__(coresys, slug)
-        self.instance: DockerApp = DockerApp(coresys, self)
+        self.instance: DockerApp | K8sApp = (
+            K8sApp(coresys, self) if coresys.k8s else DockerApp(coresys, self)
+        )
         # Last observed container state; None until first event arrives.
         self._container_state: ContainerState | None = None
         # Cached app state. Updated only via ``_update_state`` so the value
@@ -1374,7 +1378,7 @@ class App(AppModel):
         """
         return self.instance.is_running()
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> DockerStats | K8sStats:
         """Return stats of container."""
         try:
             if not await self.is_running():

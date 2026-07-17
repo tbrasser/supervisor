@@ -15,6 +15,7 @@ from ..coresys import CoreSys
 from ..docker.audio import DockerAudio
 from ..docker.const import ContainerState
 from ..docker.stats import DockerStats
+from ..k8s.audio import K8sAudio
 from ..exceptions import (
     AudioError,
     AudioJobError,
@@ -52,7 +53,9 @@ class PluginAudio(PluginBase):
         super().__init__(FILE_HASSIO_AUDIO, SCHEMA_AUDIO_CONFIG)
         self.slug = "audio"
         self.coresys: CoreSys = coresys
-        self.instance: DockerAudio = DockerAudio(coresys)
+        self.instance: DockerAudio | K8sAudio = (
+            K8sAudio(coresys) if coresys.k8s else DockerAudio(coresys)
+        )
         self.client_template: jinja2.Template | None = None
 
     @property

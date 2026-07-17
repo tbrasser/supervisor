@@ -12,6 +12,7 @@ from ..const import ATTR_IMAGE, ATTR_VERSION, BusEvent
 from ..coresys import CoreSysAttributes
 from ..docker.const import ContainerState
 from ..docker.interface import DockerInterface
+from ..k8s.interface import K8sInterface
 from ..docker.monitor import DockerContainerStateEvent
 from ..exceptions import DockerError, PluginError
 from ..utils.common import FileConfiguration
@@ -25,7 +26,7 @@ class PluginBase(ABC, FileConfiguration, CoreSysAttributes):
     """Base class for plugins."""
 
     slug: str
-    instance: DockerInterface
+    instance: DockerInterface | K8sInterface
 
     @property
     def version(self) -> AwesomeVersion | None:

@@ -14,6 +14,7 @@ from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.observer import DockerObserver
 from ..docker.stats import DockerStats
+from ..k8s.observer import K8sObserver
 from ..exceptions import (
     DockerContainerPortConflict,
     DockerError,
@@ -46,7 +47,9 @@ class PluginObserver(PluginBase):
         super().__init__(FILE_HASSIO_OBSERVER, SCHEMA_OBSERVER_CONFIG)
         self.slug = "observer"
         self.coresys: CoreSys = coresys
-        self.instance: DockerObserver = DockerObserver(coresys)
+        self.instance: DockerObserver | K8sObserver = (
+            K8sObserver(coresys) if coresys.k8s else DockerObserver(coresys)
+        )
 
     @property
     def default_image(self) -> str:

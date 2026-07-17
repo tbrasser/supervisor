@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .dbus.manager import DBusManager
     from .discovery import Discovery
     from .docker.manager import DockerAPI
+    from .k8s.manager import K8sAPI
     from .hardware.manager import HardwareManager
     from .homeassistant.module import HomeAssistant
     from .host.manager import HostManager
@@ -77,6 +78,7 @@ class CoreSys:
 
         # Internal objects pointers
         self._docker: DockerAPI | None = None
+        self._k8s: K8sAPI | None = None
         self._core: Core | None = None
         self._arch: CpuArchManager | None = None
         self._auth: Auth | None = None
@@ -222,6 +224,18 @@ class CoreSys:
         if self._docker:
             raise RuntimeError("Docker already set!")
         self._docker = value
+
+    @property
+    def k8s(self) -> K8sAPI | None:
+        """Return K8sAPI object."""
+        return self._k8s
+
+    @k8s.setter
+    def k8s(self, value: K8sAPI) -> None:
+        """Set k8s object."""
+        if self._k8s:
+            raise RuntimeError("K8s already set!")
+        self._k8s = value
 
     @property
     def scheduler(self) -> Scheduler:
@@ -717,6 +731,11 @@ class CoreSysAttributes:
     def sys_docker(self) -> DockerAPI:
         """Return DockerAPI object."""
         return self.coresys.docker
+
+    @property
+    def sys_k8s(self) -> K8sAPI | None:
+        """Return K8sAPI object."""
+        return self.coresys.k8s
 
     @property
     def sys_scheduler(self) -> Scheduler:
