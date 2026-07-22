@@ -10,9 +10,6 @@ from awesomeversion import AwesomeVersion
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.multicast import DockerMulticast
-from ..runtime.stats import ContainerStats
-from ..k8s.multicast import K8sMulticast
-from ..runtime.interface import WorkloadInstance, create_instance
 from ..exceptions import (
     DockerError,
     MulticastError,
@@ -22,6 +19,9 @@ from ..exceptions import (
 )
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.multicast import K8sMulticast
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.sentry import async_capture_exception
 from .base import PluginBase
 from .const import (

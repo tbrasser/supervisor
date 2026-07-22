@@ -12,13 +12,13 @@ from awesomeversion import AwesomeVersion
 from ..const import ATTR_ACCESS_TOKEN
 from ..coresys import CoreSys
 from ..docker.cli import DockerCli
-from ..k8s.cli import K8sCli
-from ..runtime.interface import WorkloadInstance, create_instance
 from ..docker.const import ContainerState
-from ..runtime.stats import ContainerStats
 from ..exceptions import CliError, CliJobError, CliUpdateError, DockerError, PluginError
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.cli import K8sCli
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.sentry import async_capture_exception
 from .base import PluginBase
 from .const import (
@@ -40,9 +40,7 @@ class PluginCli(PluginBase):
         super().__init__(FILE_HASSIO_CLI, SCHEMA_CLI_CONFIG)
         self.slug = "cli"
         self.coresys: CoreSys = coresys
-        self.instance: WorkloadInstance = create_instance(
-            coresys, DockerCli, K8sCli
-        )
+        self.instance: WorkloadInstance = create_instance(coresys, DockerCli, K8sCli)
 
     @property
     def default_image(self) -> str:

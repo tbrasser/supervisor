@@ -9,13 +9,13 @@ from ipaddress import IPv4Address
 import logging
 from pathlib import Path
 import tempfile
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal
 
 import aiodocker
 from awesomeversion import AwesomeVersion
 
 from ..apps.build import AppBuild
-from ..apps.const import MappingType
+from ..apps.workload import workload_environment, workload_folder_mounts
 from ..bus import EventListener
 from ..const import (
     DOCKER_CPU_RUNTIME_ALLOCATION,
@@ -45,30 +45,14 @@ from ..resolution.const import CGROUP_V2_VERSION, ContextType, IssueType, Sugges
 from ..utils.sentry import async_capture_exception
 from .const import (
     ADDON_BUILDER_IMAGE,
-    ENV_TIME,
-    ENV_TOKEN,
-    ENV_TOKEN_OLD,
     MOUNT_DBUS,
     MOUNT_DEV,
     MOUNT_DOCKER,
     MOUNT_UDEV,
-    PATH_ALL_ADDON_CONFIGS,
-    PATH_ALL_APP_CONFIGS,
-    PATH_BACKUP,
-    PATH_HOMEASSISTANT_CONFIG,
-    PATH_HOMEASSISTANT_CONFIG_LEGACY,
-    PATH_LOCAL_ADDONS,
-    PATH_LOCAL_APPS,
-    PATH_MEDIA,
-    PATH_PRIVATE_DATA,
-    PATH_PUBLIC_CONFIG,
-    PATH_SHARE,
-    PATH_SSL,
     Capabilities,
     DockerMount,
     MountBindOptions,
     MountType,
-    PropagationMode,
     Ulimit,
 )
 from .interface import DockerInterface
@@ -143,22 +127,7 @@ class DockerApp(DockerInterface):
     @property
     def environment(self) -> dict[str, str | int | None]:
         """Return environment for Docker app."""
-        app_env = cast(dict[str, str | int | None], self.app.environment or {})
-
-        # Provide options for legacy apps
-        if self.app.legacy:
-            for key, value in self.app.options.items():
-                if isinstance(value, (int, str)):
-                    app_env[key] = value
-                else:
-                    _LOGGER.warning("Can not set nested option %s as Docker env", key)
-
-        return {
-            **app_env,
-            ENV_TIME: self.sys_timezone,
-            ENV_TOKEN: self.app.supervisor_token,
-            ENV_TOKEN_OLD: self.app.supervisor_token,
-        }
+        return workload_environment(self.app)
 
     @property
     def cgroups_rules(self) -> list[str] | None:
@@ -353,148 +322,19 @@ class DockerApp(DockerInterface):
     @property
     def mounts(self) -> list[DockerMount]:
         """Return mounts for container."""
-        app_mapping = self.app.map_volumes
+        mounts = [MOUNT_DEV]
 
-        target_data_path: str | None = None
-        if MappingType.DATA in app_mapping:
-            target_data_path = app_mapping[MappingType.DATA].path
-
-        mounts = [
-            MOUNT_DEV,
-            DockerMount(
-                type=MountType.BIND,
-                source=self.app.path_extern_data.as_posix(),
-                target=target_data_path or PATH_PRIVATE_DATA.as_posix(),
-                read_only=False,
-            ),
-        ]
-
-        # setup config mappings
-        if MappingType.CONFIG in app_mapping:
+        # Folder mappings shared with other backends
+        for mount in workload_folder_mounts(self.app):
             mounts.append(
                 DockerMount(
                     type=MountType.BIND,
-                    source=self.sys_config.path_extern_homeassistant.as_posix(),
-                    target=app_mapping[MappingType.CONFIG].path
-                    or PATH_HOMEASSISTANT_CONFIG_LEGACY.as_posix(),
-                    read_only=app_mapping[MappingType.CONFIG].read_only,
-                )
-            )
-
-        else:
-            # Map app's public config folder if not using deprecated config option
-            if self.app.app_config_used:
-                config_mapping_type = (
-                    MappingType.APP_CONFIG
-                    if MappingType.APP_CONFIG in app_mapping
-                    else MappingType.ADDON_CONFIG
-                )
-                mounts.append(
-                    DockerMount(
-                        type=MountType.BIND,
-                        source=self.app.path_extern_config.as_posix(),
-                        target=app_mapping[config_mapping_type].path
-                        or PATH_PUBLIC_CONFIG.as_posix(),
-                        read_only=app_mapping[config_mapping_type].read_only,
-                    )
-                )
-
-            # Map Home Assistant config in new way
-            if MappingType.HOMEASSISTANT_CONFIG in app_mapping:
-                mounts.append(
-                    DockerMount(
-                        type=MountType.BIND,
-                        source=self.sys_config.path_extern_homeassistant.as_posix(),
-                        target=app_mapping[MappingType.HOMEASSISTANT_CONFIG].path
-                        or PATH_HOMEASSISTANT_CONFIG.as_posix(),
-                        read_only=app_mapping[
-                            MappingType.HOMEASSISTANT_CONFIG
-                        ].read_only,
-                    )
-                )
-
-        all_app_configs_mapping_type: MappingType | None = None
-        if MappingType.ALL_APP_CONFIGS in app_mapping:
-            all_app_configs_mapping_type = MappingType.ALL_APP_CONFIGS
-        elif MappingType.ALL_ADDON_CONFIGS in app_mapping:
-            all_app_configs_mapping_type = MappingType.ALL_ADDON_CONFIGS
-
-        if all_app_configs_mapping_type:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_app_configs.as_posix(),
-                    target=app_mapping[all_app_configs_mapping_type].path
-                    or (
-                        PATH_ALL_APP_CONFIGS.as_posix()
-                        if all_app_configs_mapping_type == MappingType.ALL_APP_CONFIGS
-                        else PATH_ALL_ADDON_CONFIGS.as_posix()
-                    ),
-                    read_only=app_mapping[all_app_configs_mapping_type].read_only,
-                )
-            )
-
-        if MappingType.SSL in app_mapping:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_ssl.as_posix(),
-                    target=app_mapping[MappingType.SSL].path or PATH_SSL.as_posix(),
-                    read_only=app_mapping[MappingType.SSL].read_only,
-                )
-            )
-
-        apps_mapping_type = None
-        if MappingType.LOCAL_APPS in app_mapping:
-            apps_mapping_type = MappingType.LOCAL_APPS
-        elif MappingType.ADDONS in app_mapping:
-            apps_mapping_type = MappingType.ADDONS
-
-        if apps_mapping_type:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_apps_local.as_posix(),
-                    target=app_mapping[apps_mapping_type].path
-                    or (
-                        PATH_LOCAL_APPS.as_posix()
-                        if apps_mapping_type == MappingType.LOCAL_APPS
-                        else PATH_LOCAL_ADDONS.as_posix()
-                    ),
-                    read_only=app_mapping[apps_mapping_type].read_only,
-                )
-            )
-
-        if MappingType.BACKUP in app_mapping:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_backup.as_posix(),
-                    target=app_mapping[MappingType.BACKUP].path
-                    or PATH_BACKUP.as_posix(),
-                    read_only=app_mapping[MappingType.BACKUP].read_only,
-                )
-            )
-
-        if MappingType.SHARE in app_mapping:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_share.as_posix(),
-                    target=app_mapping[MappingType.SHARE].path or PATH_SHARE.as_posix(),
-                    read_only=app_mapping[MappingType.SHARE].read_only,
-                    bind_options=MountBindOptions(propagation=PropagationMode.RSLAVE),
-                )
-            )
-
-        if MappingType.MEDIA in app_mapping:
-            mounts.append(
-                DockerMount(
-                    type=MountType.BIND,
-                    source=self.sys_config.path_extern_media.as_posix(),
-                    target=app_mapping[MappingType.MEDIA].path or PATH_MEDIA.as_posix(),
-                    read_only=app_mapping[MappingType.MEDIA].read_only,
-                    bind_options=MountBindOptions(propagation=PropagationMode.RSLAVE),
+                    source=mount.source,
+                    target=mount.target,
+                    read_only=mount.read_only,
+                    bind_options=MountBindOptions(propagation=mount.propagation)
+                    if mount.propagation
+                    else None,
                 )
             )
 

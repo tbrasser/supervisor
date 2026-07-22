@@ -178,9 +178,7 @@ class K8sMonitor(CoreSysAttributes):
             time=int(time()),
             exit_code=exit_code,
         )
-        tasks = self.sys_bus.fire_event(
-            BusEvent.CONTAINER_STATE_CHANGE, state_event
-        )
+        tasks = self.sys_bus.fire_event(BusEvent.CONTAINER_STATE_CHANGE, state_event)
         await asyncio.gather(
             *[
                 self._event_tasks.put(K8sEventCallbackTask(state_event, task))

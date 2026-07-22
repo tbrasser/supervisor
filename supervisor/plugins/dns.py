@@ -21,9 +21,6 @@ from ..dbus.const import MulticastProtocolEnabled
 from ..docker.const import ContainerState
 from ..docker.dns import DockerDNS
 from ..docker.monitor import ContainerStateEvent
-from ..runtime.stats import ContainerStats
-from ..k8s.dns import K8sDns
-from ..runtime.interface import WorkloadInstance, create_instance
 from ..exceptions import (
     ConfigurationFileError,
     CoreDNSError,
@@ -34,7 +31,10 @@ from ..exceptions import (
 )
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.dns import K8sDns
 from ..resolution.const import ContextType, IssueType, SuggestionType
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.json import write_json_file
 from ..utils.sentry import async_capture_exception
 from ..validate import dns_url
@@ -73,9 +73,7 @@ class PluginDns(PluginBase):
         super().__init__(FILE_HASSIO_DNS, SCHEMA_DNS_CONFIG)
         self.slug = "dns"
         self.coresys: CoreSys = coresys
-        self.instance: WorkloadInstance = create_instance(
-            coresys, DockerDNS, K8sDns
-        )
+        self.instance: WorkloadInstance = create_instance(coresys, DockerDNS, K8sDns)
         self._resolv_template: jinja2.Template | None = None
         self._hosts_template: jinja2.Template | None = None
 

@@ -25,8 +25,8 @@ from ..docker.const import ContainerState
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
 from .const import LABEL_APP
-from .homeassistant import HASS_K8S_NAME
 from .exceptions import K8sJobError
+from .homeassistant import HASS_K8S_NAME
 from .interface import K8sInterface
 from .stats import K8sStats
 

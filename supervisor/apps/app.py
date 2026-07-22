@@ -91,10 +91,10 @@ from ..homeassistant.const import WSEvent
 from ..jobs.const import JobConcurrency, JobThrottle
 from ..jobs.decorator import Job
 from ..k8s.app import K8sApp
-from ..runtime.interface import AppInstance, create_instance
-from ..runtime.stats import ContainerStats
 from ..resolution.const import ContextType, IssueType, SuggestionType
 from ..resolution.data import Issue
+from ..runtime.interface import AppInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..store.app import AppStore
 from ..utils import check_port
 from ..utils.apparmor import adjust_profile
@@ -150,9 +150,7 @@ class App(AppModel):
     def __init__(self, coresys: CoreSys, slug: str):
         """Initialize data holder."""
         super().__init__(coresys, slug)
-        self.instance: AppInstance = create_instance(
-            coresys, DockerApp, K8sApp, self
-        )
+        self.instance: AppInstance = create_instance(coresys, DockerApp, K8sApp, self)
         # Last observed container state; None until first event arrives.
         self._container_state: ContainerState | None = None
         # Cached app state. Updated only via ``_update_state`` so the value
@@ -1705,7 +1703,9 @@ class App(AppModel):
                 elif self.instance.version != version or self.legacy:
                     _LOGGER.info("Restore/Update of image for app %s", self.slug)
                     with suppress(DockerError):
-                        await self.instance.update(version, restore_image, arch=self.arch)
+                        await self.instance.update(
+                            version, restore_image, arch=self.arch
+                        )
                 await self._check_ingress_port()
 
                 # Restore data and config

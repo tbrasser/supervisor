@@ -458,18 +458,13 @@ async def test_listeners_removed_on_uninstall(
     # pylint: disable=protected-access
     listeners = install_app_ssh._listeners
     for listener in listeners:
-        assert (
-            listener in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
-        )
+        assert listener in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
 
     with patch.object(App, "persist", new=PropertyMock(return_value=MagicMock())):
         await coresys.apps.uninstall(TEST_ADDON_SLUG)
 
     for listener in listeners:
-        assert (
-            listener
-            not in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
-        )
+        assert listener not in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
 
 
 @pytest.mark.usefixtures("tmp_supervisor_data", "path_extern")
