@@ -1,4 +1,12 @@
-"""Supervisor app build environment."""
+"""Supervisor app build environment.
+
+Local image builds are a Docker-only capability: this module accesses the
+Docker registry credential store directly and produces images with the local
+Docker daemon.  Backend-neutral code must check
+``instance.supports_build`` before triggering a build; the Kubernetes
+backend reports ``False`` and build-requiring apps are rejected at
+install/update time.
+"""
 
 from __future__ import annotations
 

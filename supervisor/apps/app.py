@@ -930,6 +930,13 @@ class App(AppModel):
         if not self.app_store:
             raise StoreAppNotFoundError(app=self.slug)
 
+        if self.app_store.need_build and not self.instance.supports_build:
+            raise AppNotSupportedError(
+                f"App {self.slug} requires local image builds, which the "
+                "current container backend does not support",
+                _LOGGER.error,
+            )
+
         await self.sys_apps.data.install(self.app_store)
 
         def setup_data():
@@ -1055,6 +1062,13 @@ class App(AppModel):
         """
         if not self.app_store:
             raise StoreAppNotFoundError(app=self.slug)
+
+        if self.latest_need_build and not self.instance.supports_build:
+            raise AppNotSupportedError(
+                f"App {self.slug} requires local image builds, which the "
+                "current container backend does not support",
+                _LOGGER.error,
+            )
 
         old_image = self.image
         # Cache data to prevent races with other updates to global
@@ -1398,7 +1412,7 @@ class App(AppModel):
     )
     async def write_stdin(self, data) -> None:
         """Write data to app stdin."""
-        if not self.with_stdin:
+        if not self.with_stdin or not self.instance.supports_stdin:
             raise AppNotSupportedWriteStdinError(_LOGGER.error, app=self.slug)
 
         try:
