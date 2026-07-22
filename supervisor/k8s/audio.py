@@ -27,9 +27,9 @@ from awesomeversion import AwesomeVersion
 
 from ..const import AUDIO_DOCKER_NAME
 from ..docker.const import ContainerState
-from ..exceptions import DockerJobError
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 from .stats import K8sStats
 
@@ -61,7 +61,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:
@@ -73,7 +73,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_stop",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def stop(self, remove: bool = True) -> None:
@@ -81,7 +81,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_start",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     def start(self) -> Awaitable[None]:
@@ -90,7 +90,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_restart",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def restart(self) -> None:
@@ -98,7 +98,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_install",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def install(
@@ -111,7 +111,7 @@ class K8sAudio(K8sInterface):
 
     @Job(
         name="k8s_audio_update",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def update(

@@ -24,6 +24,9 @@ def mock_awaitable_bool(value: bool):
 
 async def test_repair(coresys: CoreSys):
     """Test repair."""
+    for plugin in coresys.plugins.all_plugins:
+        plugin.version = AwesomeVersion("2022.7.3")
+
     with patch.object(DockerInterface, "install") as install:
         # If instance exists, repair does nothing
         with patch.object(DockerInterface, "exists", new=mock_awaitable_bool(True)):

@@ -11,10 +11,9 @@ from awesomeversion import AwesomeVersion, AwesomeVersionException
 from ..const import ATTR_IMAGE, ATTR_VERSION, BusEvent
 from ..coresys import CoreSysAttributes
 from ..docker.const import ContainerState
-from ..docker.interface import DockerInterface
-from ..k8s.interface import K8sInterface
 from ..docker.monitor import ContainerStateEvent
 from ..exceptions import DockerError, PluginError
+from ..runtime.interface import WorkloadInstance
 from ..utils.common import FileConfiguration
 from ..utils.sentry import async_capture_exception
 from .const import WATCHDOG_MAX_ATTEMPTS, WATCHDOG_RETRY_SECONDS
@@ -26,7 +25,7 @@ class PluginBase(ABC, FileConfiguration, CoreSysAttributes):
     """Base class for plugins."""
 
     slug: str
-    instance: DockerInterface | K8sInterface
+    instance: WorkloadInstance
 
     @property
     def version(self) -> AwesomeVersion | None:

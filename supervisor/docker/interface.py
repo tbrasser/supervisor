@@ -203,6 +203,16 @@ class DockerInterface(JobGroup, ABC):
         """Healthcheck of instance if it has one."""
         return self.meta_config.get("Healthcheck")
 
+    @property
+    def supports_build(self) -> bool:
+        """Return True as the Docker backend can build images locally."""
+        return True
+
+    @property
+    def supports_stdin(self) -> bool:
+        """Return True as the Docker backend can attach to container stdin."""
+        return True
+
     def _get_credentials(self, image: str) -> tuple[dict, str]:
         """Return credentials for docker login and the qualified image name.
 

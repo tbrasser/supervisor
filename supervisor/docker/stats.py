@@ -2,8 +2,10 @@
 
 from contextlib import suppress
 
+from ..runtime.stats import ContainerStats
 
-class DockerStats:
+
+class DockerStats(ContainerStats):
     """Hold stats data from container inside."""
 
     def __init__(self, stats):
@@ -77,43 +79,3 @@ class DockerStats:
                 self._blk_read += stats["value"]
             elif stats["op"] == "Write":
                 self._blk_write += stats["value"]
-
-    @property
-    def cpu_percent(self):
-        """Return CPU percent."""
-        return round(self._cpu, 2)
-
-    @property
-    def memory_usage(self):
-        """Return memory usage."""
-        return self._memory_usage
-
-    @property
-    def memory_limit(self):
-        """Return memory limit."""
-        return self._memory_limit
-
-    @property
-    def memory_percent(self):
-        """Return memory usage in percent."""
-        return round(self._memory_percent, 2)
-
-    @property
-    def network_rx(self):
-        """Return network rx stats."""
-        return self._network_rx
-
-    @property
-    def network_tx(self):
-        """Return network rx stats."""
-        return self._network_tx
-
-    @property
-    def blk_read(self):
-        """Return block IO read stats."""
-        return self._blk_read
-
-    @property
-    def blk_write(self):
-        """Return block IO write stats."""
-        return self._blk_write

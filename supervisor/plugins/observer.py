@@ -13,8 +13,9 @@ from ..const import ATTR_ACCESS_TOKEN
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.observer import DockerObserver
-from ..docker.stats import DockerStats
+from ..runtime.stats import ContainerStats
 from ..k8s.observer import K8sObserver
+from ..runtime.interface import WorkloadInstance, create_instance
 from ..exceptions import (
     DockerContainerPortConflict,
     DockerError,
@@ -47,8 +48,8 @@ class PluginObserver(PluginBase):
         super().__init__(FILE_HASSIO_OBSERVER, SCHEMA_OBSERVER_CONFIG)
         self.slug = "observer"
         self.coresys: CoreSys = coresys
-        self.instance: DockerObserver | K8sObserver = (
-            K8sObserver(coresys) if coresys.k8s else DockerObserver(coresys)
+        self.instance: WorkloadInstance = create_instance(
+            coresys, DockerObserver, K8sObserver
         )
 
     @property
@@ -102,7 +103,7 @@ class PluginObserver(PluginBase):
         """Raise. Supervisor should not stop observer."""
         raise RuntimeError("Stopping observer without a restart is not supported!")
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of observer."""
         try:
             return await self.instance.stats()
@@ -128,9 +129,12 @@ class PluginObserver(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing HA observer %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of HA observer failed")
             await async_capture_exception(err)

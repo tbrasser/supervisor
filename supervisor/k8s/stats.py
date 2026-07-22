@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import re
 
+from ..runtime.stats import ContainerStats
+
 _CPU_MILLI_RE = re.compile(r"^(\d+)m$")
 _CPU_NANO_RE = re.compile(r"^(\d+)n$")
 _MEM_SUFFIX: dict[str, int] = {
@@ -58,7 +60,7 @@ def _parse_memory(value: str) -> int:
         return 0
 
 
-class K8sStats:
+class K8sStats(ContainerStats):
     """Hold stats data sourced from the Kubernetes Metrics API.
 
     Exposes the same properties as :class:`~supervisor.docker.stats.DockerStats`
@@ -119,43 +121,3 @@ class K8sStats:
         self._network_tx = 0
         self._blk_read = 0
         self._blk_write = 0
-
-    @property
-    def cpu_percent(self) -> float:
-        """Return CPU percent (fraction of one core × 100)."""
-        return round(self._cpu, 2)
-
-    @property
-    def memory_usage(self) -> int:
-        """Return memory usage in bytes."""
-        return self._memory_usage
-
-    @property
-    def memory_limit(self) -> int:
-        """Return memory limit in bytes (0 if unknown)."""
-        return self._memory_limit
-
-    @property
-    def memory_percent(self) -> float:
-        """Return memory usage in percent."""
-        return round(self._memory_percent, 2)
-
-    @property
-    def network_rx(self) -> int:
-        """Return network receive bytes (not available in Metrics API)."""
-        return self._network_rx
-
-    @property
-    def network_tx(self) -> int:
-        """Return network transmit bytes (not available in Metrics API)."""
-        return self._network_tx
-
-    @property
-    def blk_read(self) -> int:
-        """Return block IO read bytes (not available in Metrics API)."""
-        return self._blk_read
-
-    @property
-    def blk_write(self) -> int:
-        """Return block IO write bytes (not available in Metrics API)."""
-        return self._blk_write

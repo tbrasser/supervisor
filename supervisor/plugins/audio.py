@@ -14,8 +14,9 @@ from ..const import LogLevel
 from ..coresys import CoreSys
 from ..docker.audio import DockerAudio
 from ..docker.const import ContainerState
-from ..docker.stats import DockerStats
+from ..runtime.stats import ContainerStats
 from ..k8s.audio import K8sAudio
+from ..runtime.interface import WorkloadInstance, create_instance
 from ..exceptions import (
     AudioError,
     AudioJobError,
@@ -53,8 +54,8 @@ class PluginAudio(PluginBase):
         super().__init__(FILE_HASSIO_AUDIO, SCHEMA_AUDIO_CONFIG)
         self.slug = "audio"
         self.coresys: CoreSys = coresys
-        self.instance: DockerAudio | K8sAudio = (
-            K8sAudio(coresys) if coresys.k8s else DockerAudio(coresys)
+        self.instance: WorkloadInstance = create_instance(
+            coresys, DockerAudio, K8sAudio
         )
         self.client_template: jinja2.Template | None = None
 
@@ -151,7 +152,7 @@ class PluginAudio(PluginBase):
         except DockerError as err:
             raise AudioError("Can't stop Audio plugin", _LOGGER.error) from err
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of Audio plugin."""
         try:
             return await self.instance.stats()
@@ -163,9 +164,12 @@ class PluginAudio(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing Audio %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of Audio failed")
             await async_capture_exception(err)

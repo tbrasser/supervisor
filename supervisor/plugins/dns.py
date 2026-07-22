@@ -21,8 +21,9 @@ from ..dbus.const import MulticastProtocolEnabled
 from ..docker.const import ContainerState
 from ..docker.dns import DockerDNS
 from ..docker.monitor import ContainerStateEvent
-from ..docker.stats import DockerStats
+from ..runtime.stats import ContainerStats
 from ..k8s.dns import K8sDns
+from ..runtime.interface import WorkloadInstance, create_instance
 from ..exceptions import (
     ConfigurationFileError,
     CoreDNSError,
@@ -72,8 +73,8 @@ class PluginDns(PluginBase):
         super().__init__(FILE_HASSIO_DNS, SCHEMA_DNS_CONFIG)
         self.slug = "dns"
         self.coresys: CoreSys = coresys
-        self.instance: DockerDNS | K8sDns = (
-            K8sDns(coresys) if coresys.k8s else DockerDNS(coresys)
+        self.instance: WorkloadInstance = create_instance(
+            coresys, DockerDNS, K8sDns
         )
         self._resolv_template: jinja2.Template | None = None
         self._hosts_template: jinja2.Template | None = None
@@ -504,7 +505,7 @@ class PluginDns(PluginBase):
                 return entry
         return None
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of CoreDNS."""
         try:
             return await self.instance.stats()
@@ -516,9 +517,12 @@ class PluginDns(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing CoreDNS %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of CoreDNS failed")
             await async_capture_exception(err)

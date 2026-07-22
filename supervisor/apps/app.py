@@ -63,7 +63,6 @@ from ..docker.app import DockerApp
 from ..docker.const import EXIT_CODE_SIGTERM_DEFAULT, ContainerState
 from ..docker.manager import ExecReturn
 from ..docker.monitor import ContainerStateEvent
-from ..docker.stats import DockerStats
 from ..exceptions import (
     AppBackupMetadataInvalidError,
     AppBuildFailedUnknownError,
@@ -92,7 +91,8 @@ from ..homeassistant.const import WSEvent
 from ..jobs.const import JobConcurrency, JobThrottle
 from ..jobs.decorator import Job
 from ..k8s.app import K8sApp
-from ..k8s.stats import K8sStats
+from ..runtime.interface import AppInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..resolution.const import ContextType, IssueType, SuggestionType
 from ..resolution.data import Issue
 from ..store.app import AppStore
@@ -150,8 +150,8 @@ class App(AppModel):
     def __init__(self, coresys: CoreSys, slug: str):
         """Initialize data holder."""
         super().__init__(coresys, slug)
-        self.instance: DockerApp | K8sApp = (
-            K8sApp(coresys, self) if coresys.k8s else DockerApp(coresys, self)
+        self.instance: AppInstance = create_instance(
+            coresys, DockerApp, K8sApp, self
         )
         # Last observed container state; None until first event arrives.
         self._container_state: ContainerState | None = None
@@ -1378,7 +1378,7 @@ class App(AppModel):
         """
         return self.instance.is_running()
 
-    async def stats(self) -> DockerStats | K8sStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of container."""
         try:
             if not await self.is_running():
@@ -1685,13 +1685,13 @@ class App(AppModel):
                     else:
                         with suppress(DockerError):
                             await self.instance.install(
-                                version, restore_image, self.arch
+                                version, restore_image, arch=self.arch
                             )
                             await self.instance.cleanup()
                 elif self.instance.version != version or self.legacy:
                     _LOGGER.info("Restore/Update of image for app %s", self.slug)
                     with suppress(DockerError):
-                        await self.instance.update(version, restore_image, self.arch)
+                        await self.instance.update(version, restore_image, arch=self.arch)
                 await self._check_ingress_port()
 
                 # Restore data and config

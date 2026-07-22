@@ -334,6 +334,7 @@ async def test_update_fails_if_out_of_date(
 @pytest.mark.usefixtures("coresys")
 async def test_repair_failed(capture_exception: Mock, plugin: PluginBase):
     """Test repair failed."""
+    plugin.version = AwesomeVersion("2022.7.3")
     with (
         patch.object(DockerInterface, "exists", return_value=False),
         patch.object(
