@@ -24,7 +24,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.app import DockerApp
 from supervisor.docker.const import ContainerState
 from supervisor.docker.homeassistant import DockerHomeAssistant
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import (
     BackupError,
     BackupFileNotFoundError,
@@ -979,7 +979,7 @@ async def test_backup_with_healthcheck(
         await asyncio.sleep(0)
 
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.STOPPED,
                 id="abc123",
@@ -989,7 +989,7 @@ async def test_backup_with_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.RUNNING,
                 id="abc123",
@@ -999,7 +999,7 @@ async def test_backup_with_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.HEALTHY,
                 id="abc123",
@@ -1057,7 +1057,7 @@ async def test_restore_with_healthcheck(
         nonlocal state_changes
 
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.STOPPED,
                 id="abc123",
@@ -1067,7 +1067,7 @@ async def test_restore_with_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.RUNNING,
                 id="abc123",
@@ -1077,7 +1077,7 @@ async def test_restore_with_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.HEALTHY,
                 id="abc123",

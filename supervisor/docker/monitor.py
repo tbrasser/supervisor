@@ -20,7 +20,7 @@ STOP_MONITOR_TIMEOUT = 5.0
 
 
 @dataclass(slots=True, frozen=True)
-class DockerContainerStateEvent:
+class ContainerStateEvent:
     """Event for docker container state change.
 
     exit_code is populated for FAILED transitions where the source event or
@@ -38,7 +38,7 @@ class DockerContainerStateEvent:
 class DockerEventCallbackTask:
     """Docker event and task spawned for it."""
 
-    data: DockerContainerStateEvent
+    data: ContainerStateEvent
     task: asyncio.Task
 
 
@@ -135,7 +135,7 @@ class DockerMonitor(CoreSysAttributes):
                             container_state = ContainerState.UNHEALTHY
 
                         if container_state:
-                            state_event = DockerContainerStateEvent(
+                            state_event = ContainerStateEvent(
                                 name=attributes["name"],
                                 state=container_state,
                                 id=event["Actor"]["ID"],
@@ -143,7 +143,7 @@ class DockerMonitor(CoreSysAttributes):
                                 exit_code=exit_code,
                             )
                             tasks = self.sys_bus.fire_event(
-                                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, state_event
+                                BusEvent.CONTAINER_STATE_CHANGE, state_event
                             )
                             await asyncio.gather(
                                 *[

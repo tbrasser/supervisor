@@ -19,7 +19,7 @@ from supervisor.docker.app import DockerApp
 from supervisor.docker.const import ContainerState
 from supervisor.docker.interface import DockerInterface
 from supervisor.docker.manager import DockerAPI
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import (
     AppConfigurationError,
     AppsError,
@@ -298,8 +298,8 @@ async def test_boot_waits_for_apps(coresys: CoreSys, install_app_ssh: App):
 
         app_state = install_app_ssh.state
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.RUNNING,
                 id="abc123",
@@ -386,8 +386,8 @@ async def test_start_wait_resolved_on_uninstall_in_startup(
 
     await fire_bus_event(
         coresys,
-        BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-        DockerContainerStateEvent(
+        BusEvent.CONTAINER_STATE_CHANGE,
+        ContainerStateEvent(
             name=f"addon_{TEST_ADDON_SLUG}",
             state=ContainerState.RUNNING,
             id="abc123",
@@ -504,8 +504,8 @@ async def test_watchdog_runs_during_update(
         container.show.return_value["State"]["Status"] = "stopped"
         container.show.return_value["State"]["Running"] = False
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.STOPPED,
                 id="abc123",

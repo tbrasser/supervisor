@@ -24,8 +24,8 @@ from ..const import BusEvent, CpuArch
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.manager import CommandReturn, ExecReturn
-from ..docker.monitor import DockerContainerStateEvent
-from ..jobs.const import JOB_GROUP_DOCKER_INTERFACE, JobConcurrency
+from ..docker.monitor import ContainerStateEvent
+from ..jobs.const import JOB_GROUP_CONTAINER_INTERFACE, JobConcurrency
 from ..jobs.decorator import Job
 from ..jobs.job_group import JobGroup
 from .exceptions import K8sError, K8sJobError, K8sNotFound
@@ -56,7 +56,7 @@ class K8sInterface(JobGroup, ABC):
         """Initialize K8s workload interface."""
         super().__init__(
             coresys,
-            JOB_GROUP_DOCKER_INTERFACE.format(name=self.name or "unknown"),
+            JOB_GROUP_CONTAINER_INTERFACE.format(name=self.name or "unknown"),
             self.name,
         )
         self.coresys: CoreSys = coresys
@@ -326,8 +326,8 @@ class K8sInterface(JobGroup, ABC):
             # and id fields, which is sufficient for bus consumers that key
             # events by name.
             self.sys_bus.fire_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                DockerContainerStateEvent(self.name, state, self.name, int(time())),
+                BusEvent.CONTAINER_STATE_CHANGE,
+                ContainerStateEvent(self.name, state, self.name, int(time())),
             )
 
     async def check_image(

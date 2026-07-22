@@ -16,7 +16,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
 from supervisor.docker.interface import DOCKER_HUB, DOCKER_HUB_LEGACY, DockerInterface
 from supervisor.docker.manager import PullLogEntry, PullProgressDetail
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import (
     DockerAPIError,
     DockerError,
@@ -287,11 +287,11 @@ async def test_attach_existing_container(
         assert [
             event
             for event in fire_event.call_args_list
-            if event.args[0] == BusEvent.DOCKER_CONTAINER_STATE_CHANGE
+            if event.args[0] == BusEvent.CONTAINER_STATE_CHANGE
         ] == [
             call(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                DockerContainerStateEvent(
+                BusEvent.CONTAINER_STATE_CHANGE,
+                ContainerStateEvent(
                     "homeassistant", expected, "abc123", 1, expected_exit_code
                 ),
             )
@@ -305,13 +305,13 @@ async def test_attach_existing_container(
         docker_events = [
             event
             for event in fire_event.call_args_list
-            if event.args[0] == BusEvent.DOCKER_CONTAINER_STATE_CHANGE
+            if event.args[0] == BusEvent.CONTAINER_STATE_CHANGE
         ]
         if fired_when_skip_down:
             assert docker_events == [
                 call(
-                    BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                    DockerContainerStateEvent("homeassistant", expected, "abc123", 1),
+                    BusEvent.CONTAINER_STATE_CHANGE,
+                    ContainerStateEvent("homeassistant", expected, "abc123", 1),
                 )
             ]
         else:
@@ -331,7 +331,7 @@ async def test_attach_container_failure(coresys: CoreSys):
         assert not [
             event
             for event in fire_event.call_args_list
-            if event.args[0] == BusEvent.DOCKER_CONTAINER_STATE_CHANGE
+            if event.args[0] == BusEvent.CONTAINER_STATE_CHANGE
         ]
         assert (
             coresys.homeassistant.core.instance.meta_config["Image"] == "sha256:abc123"

@@ -21,7 +21,7 @@ from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.homeassistant import HASS_DOCKER_NAME, DockerHomeAssistant
 from ..k8s.homeassistant import HASS_K8S_NAME, K8sHomeAssistant
-from ..docker.monitor import DockerContainerStateEvent
+from ..docker.monitor import ContainerStateEvent
 from ..docker.stats import DockerStats
 from ..exceptions import (
     DockerError,
@@ -94,7 +94,7 @@ class HomeAssistantCore(JobGroup):
     async def load(self) -> None:
         """Prepare Home Assistant object."""
         self._watchdog_listener = self.sys_bus.register_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, self.watchdog_container
         )
         self.sys_bus.register_event(
             BusEvent.SUPERVISOR_STATE_CHANGE, self._supervisor_state_changed
@@ -672,7 +672,7 @@ class HomeAssistantCore(JobGroup):
         except DockerError:
             _LOGGER.error("Repairing of Home Assistant failed")
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Process state changes in Home Assistant container and restart if necessary."""
         if not (event.name == self.instance.name and self.sys_homeassistant.watchdog):
             return

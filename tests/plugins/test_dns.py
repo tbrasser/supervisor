@@ -13,7 +13,7 @@ from supervisor.const import BusEvent, LogLevel
 from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
 from supervisor.docker.dns import DockerDNS
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.plugins.dns import HostEntry, PluginDns
 from supervisor.resolution.const import (
     ContextType,
@@ -196,8 +196,8 @@ async def test_loop_detection_on_failure(coresys: CoreSys, container: DockerCont
         ),
     ):
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="hassio_dns",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -213,8 +213,8 @@ async def test_loop_detection_on_failure(coresys: CoreSys, container: DockerCont
         rebuild.reset_mock()
         container.log.return_value = ["plugin/loop: Loop"]
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="hassio_dns",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -463,8 +463,8 @@ async def test_dns_restart_triggers_connectivity_check(coresys: CoreSys):
     ):
         # Fire the DNS container state change event through bus system
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="hassio_dns",
                 state=ContainerState.RUNNING,
                 id="test_id",
@@ -484,8 +484,8 @@ async def test_dns_restart_triggers_connectivity_check(coresys: CoreSys):
 
         # Fire event for different container
         coresys.bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="hassio_homeassistant",
                 state=ContainerState.RUNNING,
                 id="test_id",

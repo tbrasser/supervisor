@@ -61,10 +61,10 @@ from ..exceptions import (
     AppNotSupportedError,
     AppNotSupportedWriteStdinError,
     CoreDNSError,
-    DockerJobError,
 )
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 
 if TYPE_CHECKING:
@@ -406,7 +406,7 @@ class K8sApp(K8sInterface):
 
     @Job(
         name="k8s_app_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:

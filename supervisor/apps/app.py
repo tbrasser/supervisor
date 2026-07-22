@@ -62,7 +62,7 @@ from ..coresys import CoreSys
 from ..docker.app import DockerApp
 from ..docker.const import EXIT_CODE_SIGTERM_DEFAULT, ContainerState
 from ..docker.manager import ExecReturn
-from ..docker.monitor import DockerContainerStateEvent
+from ..docker.monitor import ContainerStateEvent
 from ..docker.stats import DockerStats
 from ..exceptions import (
     AppBackupMetadataInvalidError,
@@ -282,12 +282,12 @@ class App(AppModel):
 
         self._listeners.append(
             self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.container_state_changed
+                BusEvent.CONTAINER_STATE_CHANGE, self.container_state_changed
             )
         )
         self._listeners.append(
             self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.watchdog_container
+                BusEvent.CONTAINER_STATE_CHANGE, self.watchdog_container
             )
         )
 
@@ -1818,7 +1818,7 @@ class App(AppModel):
             )
             await asyncio.sleep(delay)
 
-    async def container_state_changed(self, event: DockerContainerStateEvent) -> None:
+    async def container_state_changed(self, event: ContainerStateEvent) -> None:
         """Update cached container state and emit transitions."""
         if event.name != self.instance.name:
             return
@@ -1845,7 +1845,7 @@ class App(AppModel):
         # An observed container state supersedes any prior operation error.
         self._update_state(container_state=event.state)
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Process state changes in app container and restart if necessary."""
         if event.name != self.instance.name:
             return

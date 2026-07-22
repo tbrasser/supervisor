@@ -9,7 +9,7 @@ from awesomeversion import AwesomeVersion
 from supervisor.const import BusEvent, CoreState
 from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import HomeAssistantError
 
 from tests.common import fire_bus_event
@@ -39,8 +39,8 @@ async def test_home_assistant_watchdog(coresys: CoreSys) -> None:
         current_state.return_value = ContainerState.UNHEALTHY
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.UNHEALTHY,
                 id="abc123",
@@ -54,8 +54,8 @@ async def test_home_assistant_watchdog(coresys: CoreSys) -> None:
         current_state.return_value = ContainerState.FAILED
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -71,8 +71,8 @@ async def test_home_assistant_watchdog(coresys: CoreSys) -> None:
         current_state.return_value = ContainerState.HEALTHY
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -86,8 +86,8 @@ async def test_home_assistant_watchdog(coresys: CoreSys) -> None:
         # Do not restart when home assistant stopped normally
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.STOPPED,
                 id="abc123",
@@ -100,8 +100,8 @@ async def test_home_assistant_watchdog(coresys: CoreSys) -> None:
         # Other containers ignored
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="addon_local_other",
                 state=ContainerState.UNHEALTHY,
                 id="abc123",
@@ -139,8 +139,8 @@ async def test_home_assistant_watchdog_rebuild_on_failure(coresys: CoreSys) -> N
     ):
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -162,7 +162,7 @@ async def test_home_assistant_watchdog_skip_on_load(
     coresys.homeassistant.core.watchdog = True
 
     events = AsyncMock()
-    coresys.bus.register_event(BusEvent.DOCKER_CONTAINER_STATE_CHANGE, events)
+    coresys.bus.register_event(BusEvent.CONTAINER_STATE_CHANGE, events)
 
     coresys.homeassistant.version = AwesomeVersion("2022.7.3")
     with (
@@ -214,8 +214,8 @@ async def test_home_assistant_watchdog_unregisters_on_shutdown(
         # Watchdog should respond to events before shutdown
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="homeassistant",
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -244,8 +244,8 @@ async def test_home_assistant_watchdog_unregisters_on_shutdown(
             # Watchdog should not respond to events after shutdown
             await fire_bus_event(
                 coresys,
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                DockerContainerStateEvent(
+                BusEvent.CONTAINER_STATE_CHANGE,
+                ContainerStateEvent(
                     name="homeassistant",
                     state=ContainerState.FAILED,
                     id="abc123",

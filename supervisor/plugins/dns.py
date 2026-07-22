@@ -20,7 +20,7 @@ from ..coresys import CoreSys
 from ..dbus.const import MulticastProtocolEnabled
 from ..docker.const import ContainerState
 from ..docker.dns import DockerDNS
-from ..docker.monitor import DockerContainerStateEvent
+from ..docker.monitor import ContainerStateEvent
 from ..docker.stats import DockerStats
 from ..k8s.dns import K8sDns
 from ..exceptions import (
@@ -118,7 +118,7 @@ class PluginDns(PluginBase):
 
         return servers
 
-    async def _on_dns_container_running(self, event: DockerContainerStateEvent) -> None:
+    async def _on_dns_container_running(self, event: ContainerStateEvent) -> None:
         """Handle DNS container state change to running and trigger connectivity check."""
         if event.name == self.instance.name and event.state == ContainerState.RUNNING:
             # Wait before CoreDNS actually becomes available
@@ -253,7 +253,7 @@ class PluginDns(PluginBase):
         # Register Docker event listener for connectivity checks
         if not self._connectivity_check_listener:
             self._connectivity_check_listener = self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self._on_dns_container_running
+                BusEvent.CONTAINER_STATE_CHANGE, self._on_dns_container_running
             )
 
         await super().load()
@@ -347,7 +347,7 @@ class PluginDns(PluginBase):
 
         await self.sys_apps.sync_dns()
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Check for loop on failure before processing state change event."""
         if event.name == self.instance.name and event.state == ContainerState.FAILED:
             await self.loop_detection()

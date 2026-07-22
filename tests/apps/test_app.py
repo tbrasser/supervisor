@@ -30,7 +30,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.app import DockerApp
 from supervisor.docker.const import ContainerState
 from supervisor.docker.manager import CommandReturn, DockerAPI
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import (
     AppFileReadError,
     AppPortConflict,
@@ -67,8 +67,8 @@ async def _fire_test_event(
     """Fire a test event and await the listener tasks the bus spawned."""
     await fire_bus_event(
         coresys,
-        BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-        DockerContainerStateEvent(
+        BusEvent.CONTAINER_STATE_CHANGE,
+        ContainerStateEvent(
             name=name,
             state=state,
             id="abc123",
@@ -459,7 +459,7 @@ async def test_listeners_removed_on_uninstall(
     listeners = install_app_ssh._listeners
     for listener in listeners:
         assert (
-            listener in coresys.bus._listeners[BusEvent.DOCKER_CONTAINER_STATE_CHANGE]
+            listener in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
         )
 
     with patch.object(App, "persist", new=PropertyMock(return_value=MagicMock())):
@@ -468,7 +468,7 @@ async def test_listeners_removed_on_uninstall(
     for listener in listeners:
         assert (
             listener
-            not in coresys.bus._listeners[BusEvent.DOCKER_CONTAINER_STATE_CHANGE]
+            not in coresys.bus._listeners[BusEvent.CONTAINER_STATE_CHANGE]
         )
 
 

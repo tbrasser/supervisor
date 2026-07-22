@@ -13,7 +13,7 @@ from ..coresys import CoreSysAttributes
 from ..docker.const import ContainerState
 from ..docker.interface import DockerInterface
 from ..k8s.interface import K8sInterface
-from ..docker.monitor import DockerContainerStateEvent
+from ..docker.monitor import ContainerStateEvent
 from ..exceptions import DockerError, PluginError
 from ..utils.common import FileConfiguration
 from ..utils.sentry import async_capture_exception
@@ -94,10 +94,10 @@ class PluginBase(ABC, FileConfiguration, CoreSysAttributes):
     def start_watchdog(self) -> None:
         """Register docker container listener for plugin."""
         self.sys_bus.register_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, self.watchdog_container
         )
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Process state changes in plugin container and restart if necessary."""
         if event.name != self.instance.name:
             return
