@@ -52,7 +52,7 @@ jobs:
 
       - name: Generate build version
         id: version
-        run: echo "version=$(date -u +'%Y.%m.%d').dev${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(date -u +'%Y.%m.%d').dev${{ github.run_id }}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata
         id: meta
