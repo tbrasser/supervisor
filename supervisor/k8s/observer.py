@@ -22,10 +22,10 @@ from awesomeversion import AwesomeVersion
 
 from ..const import OBSERVER_DOCKER_NAME, OBSERVER_PORT
 from ..docker.const import ContainerState
-from ..exceptions import DockerJobError
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
 from .const import LABEL_APP
+from .exceptions import K8sJobError
 from .homeassistant import HASS_K8S_NAME
 from .interface import K8sInterface
 from .stats import K8sStats
@@ -58,7 +58,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:
@@ -82,7 +82,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_stop",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def stop(self, remove: bool = True) -> None:
@@ -92,7 +92,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_start",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     def start(self) -> Awaitable[None]:
@@ -101,7 +101,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_restart",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def restart(self) -> None:
@@ -110,7 +110,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_install",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def install(
@@ -124,7 +124,7 @@ class K8sObserver(K8sInterface):
 
     @Job(
         name="k8s_observer_update",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def update(

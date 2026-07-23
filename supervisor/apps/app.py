@@ -62,8 +62,7 @@ from ..coresys import CoreSys
 from ..docker.app import DockerApp
 from ..docker.const import EXIT_CODE_SIGTERM_DEFAULT, ContainerState
 from ..docker.manager import ExecReturn
-from ..docker.monitor import DockerContainerStateEvent
-from ..docker.stats import DockerStats
+from ..docker.monitor import ContainerStateEvent
 from ..exceptions import (
     AppBackupMetadataInvalidError,
     AppBuildFailedUnknownError,
@@ -92,9 +91,10 @@ from ..homeassistant.const import WSEvent
 from ..jobs.const import JobConcurrency, JobThrottle
 from ..jobs.decorator import Job
 from ..k8s.app import K8sApp
-from ..k8s.stats import K8sStats
 from ..resolution.const import ContextType, IssueType, SuggestionType
 from ..resolution.data import Issue
+from ..runtime.interface import AppInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..store.app import AppStore
 from ..utils import check_port
 from ..utils.apparmor import adjust_profile
@@ -150,9 +150,7 @@ class App(AppModel):
     def __init__(self, coresys: CoreSys, slug: str):
         """Initialize data holder."""
         super().__init__(coresys, slug)
-        self.instance: DockerApp | K8sApp = (
-            K8sApp(coresys, self) if coresys.k8s else DockerApp(coresys, self)
-        )
+        self.instance: AppInstance = create_instance(coresys, DockerApp, K8sApp, self)
         # Last observed container state; None until first event arrives.
         self._container_state: ContainerState | None = None
         # Cached app state. Updated only via ``_update_state`` so the value
@@ -282,12 +280,12 @@ class App(AppModel):
 
         self._listeners.append(
             self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.container_state_changed
+                BusEvent.CONTAINER_STATE_CHANGE, self.container_state_changed
             )
         )
         self._listeners.append(
             self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.watchdog_container
+                BusEvent.CONTAINER_STATE_CHANGE, self.watchdog_container
             )
         )
 
@@ -930,6 +928,13 @@ class App(AppModel):
         if not self.app_store:
             raise StoreAppNotFoundError(app=self.slug)
 
+        if self.app_store.need_build and not self.instance.supports_build:
+            raise AppNotSupportedError(
+                f"App {self.slug} requires local image builds, which the "
+                "current container backend does not support",
+                _LOGGER.error,
+            )
+
         await self.sys_apps.data.install(self.app_store)
 
         def setup_data():
@@ -1055,6 +1060,13 @@ class App(AppModel):
         """
         if not self.app_store:
             raise StoreAppNotFoundError(app=self.slug)
+
+        if self.latest_need_build and not self.instance.supports_build:
+            raise AppNotSupportedError(
+                f"App {self.slug} requires local image builds, which the "
+                "current container backend does not support",
+                _LOGGER.error,
+            )
 
         old_image = self.image
         # Cache data to prevent races with other updates to global
@@ -1378,7 +1390,7 @@ class App(AppModel):
         """
         return self.instance.is_running()
 
-    async def stats(self) -> DockerStats | K8sStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of container."""
         try:
             if not await self.is_running():
@@ -1398,7 +1410,7 @@ class App(AppModel):
     )
     async def write_stdin(self, data) -> None:
         """Write data to app stdin."""
-        if not self.with_stdin:
+        if not self.with_stdin or not self.instance.supports_stdin:
             raise AppNotSupportedWriteStdinError(_LOGGER.error, app=self.slug)
 
         try:
@@ -1685,13 +1697,15 @@ class App(AppModel):
                     else:
                         with suppress(DockerError):
                             await self.instance.install(
-                                version, restore_image, self.arch
+                                version, restore_image, arch=self.arch
                             )
                             await self.instance.cleanup()
                 elif self.instance.version != version or self.legacy:
                     _LOGGER.info("Restore/Update of image for app %s", self.slug)
                     with suppress(DockerError):
-                        await self.instance.update(version, restore_image, self.arch)
+                        await self.instance.update(
+                            version, restore_image, arch=self.arch
+                        )
                 await self._check_ingress_port()
 
                 # Restore data and config
@@ -1818,7 +1832,7 @@ class App(AppModel):
             )
             await asyncio.sleep(delay)
 
-    async def container_state_changed(self, event: DockerContainerStateEvent) -> None:
+    async def container_state_changed(self, event: ContainerStateEvent) -> None:
         """Update cached container state and emit transitions."""
         if event.name != self.instance.name:
             return
@@ -1845,7 +1859,7 @@ class App(AppModel):
         # An observed container state supersedes any prior operation error.
         self._update_state(container_state=event.state)
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Process state changes in app container and restart if necessary."""
         if event.name != self.instance.name:
             return

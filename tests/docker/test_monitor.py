@@ -12,7 +12,7 @@ from supervisor.bus import Bus
 from supervisor.const import BusEvent
 from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 
 
 @pytest.mark.parametrize(
@@ -111,8 +111,8 @@ async def test_events(
         await coresys.docker.monitor.unload()
         if expected:
             fire_event.assert_called_once_with(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                DockerContainerStateEvent(
+                BusEvent.CONTAINER_STATE_CHANGE,
+                ContainerStateEvent(
                     "some_container", expected, "abc123", 123, expected_exit_code
                 ),
             )
@@ -147,8 +147,8 @@ async def test_unlabeled_container(coresys: CoreSys, container: DockerContainer)
         )
         await coresys.docker.monitor.unload()
         fire_event.assert_called_once_with(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 "homeassistant", ContainerState.FAILED, "abc123", 123, 137
             ),
         )

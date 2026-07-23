@@ -410,8 +410,12 @@ class AppManager(CoreSysAttributes):
                     await app.instance.install(app.version, app.image)
                     continue
 
-                # Need local lookup
-                if app.need_build and not app.is_detached:
+                # Need local lookup - only possible if backend can build
+                if (
+                    app.need_build
+                    and app.instance.supports_build
+                    and not app.is_detached
+                ):
                     store = self.store[app.slug]
                     # If this app is available for rebuild
                     if app.version == store.version:
@@ -432,12 +436,16 @@ class AppManager(CoreSysAttributes):
                     continue
             except DockerError as err:
                 _LOGGER.warning("App %s is corrupt: %s", app.slug, err)
-                self.sys_resolution.create_issue(
-                    IssueType.CORRUPT_DOCKER,
-                    ContextType.ADDON,
-                    reference=app.slug,
-                    suggestions=[SuggestionType.EXECUTE_REPAIR],
-                )
+                # CORRUPT_DOCKER is a Docker-specific issue; on the
+                # Kubernetes backend a failed state query has other causes
+                # (e.g. API server hiccup) and repair suggestions don't apply.
+                if not self.sys_k8s:
+                    self.sys_resolution.create_issue(
+                        IssueType.CORRUPT_DOCKER,
+                        ContextType.ADDON,
+                        reference=app.slug,
+                        suggestions=[SuggestionType.EXECUTE_REPAIR],
+                    )
                 await async_capture_exception(err)
             else:
                 add_host_coros.append(

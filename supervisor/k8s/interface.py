@@ -17,6 +17,7 @@ from collections.abc import Awaitable
 import contextlib
 import logging
 from time import time
+from typing import cast
 
 from awesomeversion import AwesomeVersion
 
@@ -24,8 +25,8 @@ from ..const import BusEvent, CpuArch
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.manager import CommandReturn, ExecReturn
-from ..docker.monitor import DockerContainerStateEvent
-from ..jobs.const import JOB_GROUP_DOCKER_INTERFACE, JobConcurrency
+from ..docker.monitor import ContainerStateEvent
+from ..jobs.const import JOB_GROUP_CONTAINER_INTERFACE, JobConcurrency
 from ..jobs.decorator import Job
 from ..jobs.job_group import JobGroup
 from .exceptions import K8sError, K8sJobError, K8sNotFound
@@ -56,7 +57,7 @@ class K8sInterface(JobGroup, ABC):
         """Initialize K8s workload interface."""
         super().__init__(
             coresys,
-            JOB_GROUP_DOCKER_INTERFACE.format(name=self.name or "unknown"),
+            JOB_GROUP_CONTAINER_INTERFACE.format(name=self.name or "unknown"),
             self.name,
         )
         self.coresys: CoreSys = coresys
@@ -115,16 +116,41 @@ class K8sInterface(JobGroup, ABC):
         """
         return None
 
+    @property
+    def meta_config(self) -> dict:
+        """Return container config metadata.
+
+        Kubernetes does not expose Docker-style container config metadata,
+        so an empty mapping is reported.
+        """
+        return {}
+
+    @property
+    def supports_build(self) -> bool:
+        """Return False as the Kubernetes backend cannot build images.
+
+        Images are pulled from a registry by the cluster; local builds are a
+        Docker-only capability.
+        """
+        return False
+
+    @property
+    def supports_stdin(self) -> bool:
+        """Return False as the Kubernetes backend cannot attach to stdin."""
+        return False
+
     # ------------------------------------------------------------------
     # Convenience accessors
     # ------------------------------------------------------------------
 
     @property
     def k8s(self) -> K8sAPI:
-        """Return K8s manager."""
-        # The k8s manager is stored on coresys just like the docker manager.
-        # During the transition period it may live under coresys.k8s.
-        return self.coresys.k8s  # type: ignore[attr-defined]
+        """Return K8s manager.
+
+        Only accessed when the Kubernetes backend is active, i.e.
+        ``coresys.k8s`` is set.
+        """
+        return cast(K8sAPI, self.coresys.k8s)
 
     # ------------------------------------------------------------------
     # Core lifecycle methods (mirror DockerInterface API)
@@ -326,8 +352,8 @@ class K8sInterface(JobGroup, ABC):
             # and id fields, which is sufficient for bus consumers that key
             # events by name.
             self.sys_bus.fire_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                DockerContainerStateEvent(self.name, state, self.name, int(time())),
+                BusEvent.CONTAINER_STATE_CHANGE,
+                ContainerStateEvent(self.name, state, self.name, int(time())),
             )
 
     async def check_image(
@@ -417,12 +443,32 @@ class K8sInterface(JobGroup, ABC):
         """Return resource usage stats for this workload."""
         return await self.k8s.pod_stats(self.name)
 
+    async def get_latest_version(self) -> AwesomeVersion:
+        """Return the version currently deployed for this workload.
+
+        Kubernetes has no local image store to inspect; the image tag of the
+        existing Deployment is the best available version information.
+        """
+        deployment = await self.k8s.get_deployment(self.name)
+        if deployment:
+            containers = (
+                deployment.get("spec", {})
+                .get("template", {})
+                .get("spec", {})
+                .get("containers", [])
+            )
+            image = containers[0].get("image", "") if containers else ""
+            tag = image.rpartition("/")[2].partition(":")[2]
+            if tag:
+                return AwesomeVersion(tag)
+        raise K8sNotFound(f"No version found for {self.name}", _LOGGER.info)
+
     @Job(
         name="k8s_interface_execute_command",
         on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
-    async def execute_command(self, command: list[str]) -> CommandReturn:
+    async def execute_command(self, command: str) -> CommandReturn:
         """Execute *command* inside the running Pod and return its output."""
         raise NotImplementedError
 

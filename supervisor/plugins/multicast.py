@@ -10,8 +10,6 @@ from awesomeversion import AwesomeVersion
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.multicast import DockerMulticast
-from ..docker.stats import DockerStats
-from ..k8s.multicast import K8sMulticast
 from ..exceptions import (
     DockerError,
     MulticastError,
@@ -21,6 +19,9 @@ from ..exceptions import (
 )
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.multicast import K8sMulticast
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.sentry import async_capture_exception
 from .base import PluginBase
 from .const import (
@@ -42,8 +43,8 @@ class PluginMulticast(PluginBase):
         super().__init__(FILE_HASSIO_MULTICAST, SCHEMA_MULTICAST_CONFIG)
         self.slug = "multicast"
         self.coresys: CoreSys = coresys
-        self.instance: DockerMulticast | K8sMulticast = (
-            K8sMulticast(coresys) if coresys.k8s else DockerMulticast(coresys)
+        self.instance: WorkloadInstance = create_instance(
+            coresys, DockerMulticast, K8sMulticast
         )
 
     @property
@@ -96,7 +97,7 @@ class PluginMulticast(PluginBase):
         except DockerError as err:
             raise MulticastError("Can't stop Multicast plugin", _LOGGER.error) from err
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of Multicast."""
         try:
             return await self.instance.stats()
@@ -108,9 +109,12 @@ class PluginMulticast(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing Multicast %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of Multicast failed")
             await async_capture_exception(err)

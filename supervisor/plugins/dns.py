@@ -20,9 +20,7 @@ from ..coresys import CoreSys
 from ..dbus.const import MulticastProtocolEnabled
 from ..docker.const import ContainerState
 from ..docker.dns import DockerDNS
-from ..docker.monitor import DockerContainerStateEvent
-from ..docker.stats import DockerStats
-from ..k8s.dns import K8sDns
+from ..docker.monitor import ContainerStateEvent
 from ..exceptions import (
     ConfigurationFileError,
     CoreDNSError,
@@ -33,7 +31,10 @@ from ..exceptions import (
 )
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.dns import K8sDns
 from ..resolution.const import ContextType, IssueType, SuggestionType
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.json import write_json_file
 from ..utils.sentry import async_capture_exception
 from ..validate import dns_url
@@ -72,9 +73,7 @@ class PluginDns(PluginBase):
         super().__init__(FILE_HASSIO_DNS, SCHEMA_DNS_CONFIG)
         self.slug = "dns"
         self.coresys: CoreSys = coresys
-        self.instance: DockerDNS | K8sDns = (
-            K8sDns(coresys) if coresys.k8s else DockerDNS(coresys)
-        )
+        self.instance: WorkloadInstance = create_instance(coresys, DockerDNS, K8sDns)
         self._resolv_template: jinja2.Template | None = None
         self._hosts_template: jinja2.Template | None = None
 
@@ -118,7 +117,7 @@ class PluginDns(PluginBase):
 
         return servers
 
-    async def _on_dns_container_running(self, event: DockerContainerStateEvent) -> None:
+    async def _on_dns_container_running(self, event: ContainerStateEvent) -> None:
         """Handle DNS container state change to running and trigger connectivity check."""
         if event.name == self.instance.name and event.state == ContainerState.RUNNING:
             # Wait before CoreDNS actually becomes available
@@ -253,7 +252,7 @@ class PluginDns(PluginBase):
         # Register Docker event listener for connectivity checks
         if not self._connectivity_check_listener:
             self._connectivity_check_listener = self.sys_bus.register_event(
-                BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self._on_dns_container_running
+                BusEvent.CONTAINER_STATE_CHANGE, self._on_dns_container_running
             )
 
         await super().load()
@@ -347,7 +346,7 @@ class PluginDns(PluginBase):
 
         await self.sys_apps.sync_dns()
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Check for loop on failure before processing state change event."""
         if event.name == self.instance.name and event.state == ContainerState.FAILED:
             await self.loop_detection()
@@ -504,7 +503,7 @@ class PluginDns(PluginBase):
                 return entry
         return None
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of CoreDNS."""
         try:
             return await self.instance.stats()
@@ -516,9 +515,12 @@ class PluginDns(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing CoreDNS %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of CoreDNS failed")
             await async_capture_exception(err)

@@ -2,7 +2,7 @@
 
 This module watches the Kubernetes Pod event stream inside the Supervisor-managed
 namespace and converts Pod phase / condition changes into the same
-:class:`~supervisor.docker.monitor.DockerContainerStateEvent` events that the
+:class:`~supervisor.docker.monitor.ContainerStateEvent` events that the
 rest of Supervisor already listens on.  This makes it possible for higher-level
 components (add-ons, Home Assistant, plugins) to react to container-lifecycle
 events without knowing whether the underlying runtime is Docker or Kubernetes.
@@ -21,7 +21,7 @@ from kubernetes_asyncio import client, watch
 from ..const import BusEvent
 from ..coresys import CoreSys, CoreSysAttributes
 from ..docker.const import ContainerState
-from ..docker.monitor import DockerContainerStateEvent
+from ..docker.monitor import ContainerStateEvent
 from ..exceptions import HassioError
 from ..utils.sentry import async_capture_exception, capture_exception
 from .const import K8S_NAMESPACE, LABEL_MANAGED
@@ -35,7 +35,7 @@ STOP_MONITOR_TIMEOUT = 10.0
 class K8sEventCallbackTask:
     """Kubernetes event paired with the asyncio task spawned for it."""
 
-    data: DockerContainerStateEvent
+    data: ContainerStateEvent
     task: asyncio.Task
 
 
@@ -171,16 +171,14 @@ class K8sMonitor(CoreSysAttributes):
         if container_state is None:
             return
 
-        state_event = DockerContainerStateEvent(
+        state_event = ContainerStateEvent(
             name=app_name,
             state=container_state,
             id=pod_uid,
             time=int(time()),
             exit_code=exit_code,
         )
-        tasks = self.sys_bus.fire_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, state_event
-        )
+        tasks = self.sys_bus.fire_event(BusEvent.CONTAINER_STATE_CHANGE, state_event)
         await asyncio.gather(
             *[
                 self._event_tasks.put(K8sEventCallbackTask(state_event, task))

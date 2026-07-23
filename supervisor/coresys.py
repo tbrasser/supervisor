@@ -37,12 +37,12 @@ if TYPE_CHECKING:
     from .dbus.manager import DBusManager
     from .discovery import Discovery
     from .docker.manager import DockerAPI
-    from .k8s.manager import K8sAPI
     from .hardware.manager import HardwareManager
     from .homeassistant.module import HomeAssistant
     from .host.manager import HostManager
     from .ingress import Ingress
     from .jobs import JobManager
+    from .k8s.manager import K8sAPI
     from .misc.scheduler import Scheduler
     from .misc.tasks import Tasks
     from .mounts.manager import MountManager

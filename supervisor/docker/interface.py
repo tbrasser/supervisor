@@ -38,7 +38,7 @@ from ..exceptions import (
     DockerTimeoutError,
     GithubContainerRegistryRateLimitExceeded,
 )
-from ..jobs.const import JOB_GROUP_DOCKER_INTERFACE, JobConcurrency
+from ..jobs.const import JOB_GROUP_CONTAINER_INTERFACE, JobConcurrency
 from ..jobs.decorator import Job
 from ..jobs.job_group import JobGroup
 from ..resolution.const import ContextType, IssueType, SuggestionType
@@ -51,7 +51,7 @@ from .const import (
     RestartPolicy,
 )
 from .manager import CommandReturn, ExecReturn, PullLogEntry
-from .monitor import DockerContainerStateEvent
+from .monitor import ContainerStateEvent
 from .pull_progress import ImagePullProgress
 from .stats import DockerStats
 from .utils import get_registry_from_image
@@ -112,7 +112,7 @@ class DockerInterface(JobGroup, ABC):
         """Initialize Docker base wrapper."""
         super().__init__(
             coresys,
-            JOB_GROUP_DOCKER_INTERFACE.format_map(
+            JOB_GROUP_CONTAINER_INTERFACE.format_map(
                 defaultdict(str, name=self.name or uuid4().hex)
             ),
             self.name,
@@ -202,6 +202,16 @@ class DockerInterface(JobGroup, ABC):
     def healthcheck(self) -> dict[str, Any] | None:
         """Healthcheck of instance if it has one."""
         return self.meta_config.get("Healthcheck")
+
+    @property
+    def supports_build(self) -> bool:
+        """Return True as the Docker backend can build images locally."""
+        return True
+
+    @property
+    def supports_stdin(self) -> bool:
+        """Return True as the Docker backend can attach to container stdin."""
+        return True
 
     def _get_credentials(self, image: str) -> tuple[dict, str]:
         """Return credentials for docker login and the qualified image name.
@@ -454,8 +464,8 @@ class DockerInterface(JobGroup, ABC):
             ):
                 # Fire event with current state of container
                 self.sys_bus.fire_event(
-                    BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-                    DockerContainerStateEvent(
+                    BusEvent.CONTAINER_STATE_CHANGE,
+                    ContainerStateEvent(
                         self.name, state, docker_container.id, int(time()), exit_code
                     ),
                 )

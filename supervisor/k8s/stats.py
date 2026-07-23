@@ -142,20 +142,20 @@ class K8sStats:
 
     @property
     def network_rx(self) -> int:
-        """Return network receive bytes (not available in Metrics API)."""
+        """Return network receive bytes (0 if not available)."""
         return self._network_rx
 
     @property
     def network_tx(self) -> int:
-        """Return network transmit bytes (not available in Metrics API)."""
+        """Return network transmit bytes (0 if not available)."""
         return self._network_tx
 
     @property
     def blk_read(self) -> int:
-        """Return block IO read bytes (not available in Metrics API)."""
+        """Return block IO read bytes (0 if not available)."""
         return self._blk_read
 
     @property
     def blk_write(self) -> int:
-        """Return block IO write bytes (not available in Metrics API)."""
+        """Return block IO write bytes (0 if not available)."""
         return self._blk_write

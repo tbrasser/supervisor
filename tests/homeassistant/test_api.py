@@ -8,7 +8,7 @@ import pytest
 
 from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import DockerError, HomeAssistantAPIError
 from supervisor.homeassistant.api import APIState, HomeAssistantAPI
 from supervisor.homeassistant.const import LANDINGPAGE
@@ -183,7 +183,7 @@ async def test_connected_log_after_container_restart(
     # Container stops
     caplog.clear()
     await api.container_state_changed(
-        DockerContainerStateEvent(
+        ContainerStateEvent(
             name="homeassistant",
             state=ContainerState.STOPPED,
             id="abc123",
@@ -217,7 +217,7 @@ async def test_container_state_changed_ignores_other_containers(
     # Other container stops — should not reset
     caplog.clear()
     await api.container_state_changed(
-        DockerContainerStateEvent(
+        ContainerStateEvent(
             name="addon_local_ssh",
             state=ContainerState.STOPPED,
             id="abc123",

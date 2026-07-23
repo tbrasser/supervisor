@@ -38,33 +38,16 @@ from typing import TYPE_CHECKING, Any, cast
 
 from awesomeversion import AwesomeVersion
 
-from ..apps.const import MappingType
+from ..apps.workload import workload_environment, workload_folder_mounts
 from ..coresys import CoreSys
-from ..docker.const import (
-    ENV_TIME,
-    ENV_TOKEN,
-    ENV_TOKEN_OLD,
-    PATH_ALL_ADDON_CONFIGS,
-    PATH_ALL_APP_CONFIGS,
-    PATH_BACKUP,
-    PATH_HOMEASSISTANT_CONFIG,
-    PATH_HOMEASSISTANT_CONFIG_LEGACY,
-    PATH_LOCAL_ADDONS,
-    PATH_LOCAL_APPS,
-    PATH_MEDIA,
-    PATH_PRIVATE_DATA,
-    PATH_PUBLIC_CONFIG,
-    PATH_SHARE,
-    PATH_SSL,
-)
 from ..exceptions import (
     AppNotSupportedError,
     AppNotSupportedWriteStdinError,
     CoreDNSError,
-    DockerJobError,
 )
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 
 if TYPE_CHECKING:
@@ -125,22 +108,7 @@ class K8sApp(K8sInterface):
     @property
     def environment(self) -> dict[str, str | int | None]:
         """Return environment for the app container."""
-        app_env = cast(dict[str, str | int | None], self.app.environment or {})
-
-        # Provide options for legacy apps
-        if self.app.legacy:
-            for key, value in self.app.options.items():
-                if isinstance(value, (int, str)):
-                    app_env[key] = value
-                else:
-                    _LOGGER.warning("Can not set nested option %s as environment", key)
-
-        return {
-            **app_env,
-            ENV_TIME: self.sys_timezone,
-            ENV_TOKEN: self.app.supervisor_token,
-            ENV_TOKEN_OLD: self.app.supervisor_token,
-        }
+        return workload_environment(self.app)
 
     # ------------------------------------------------------------------
     # Validation
@@ -207,139 +175,15 @@ class K8sApp(K8sInterface):
         audio, D-Bus and journald mounts are excluded – apps requiring them
         are rejected by :meth:`_validate_supported`.
         """
-        app_mapping = self.app.map_volumes
         mounts: list[dict[str, Any]] = []
         volumes: list[dict[str, Any]] = []
 
-        target_data_path: str | None = None
-        if MappingType.DATA in app_mapping:
-            target_data_path = app_mapping[MappingType.DATA].path
-
-        self._folder_mount(
-            "data",
-            self.app.path_extern_data.as_posix(),
-            target_data_path or PATH_PRIVATE_DATA.as_posix(),
-            False,
-            mounts,
-            volumes,
-        )
-
-        if MappingType.CONFIG in app_mapping:
+        for mount in workload_folder_mounts(self.app):
             self._folder_mount(
-                "config",
-                self.sys_config.path_extern_homeassistant.as_posix(),
-                app_mapping[MappingType.CONFIG].path
-                or PATH_HOMEASSISTANT_CONFIG_LEGACY.as_posix(),
-                app_mapping[MappingType.CONFIG].read_only,
-                mounts,
-                volumes,
-            )
-        else:
-            if self.app.app_config_used:
-                config_mapping_type = (
-                    MappingType.APP_CONFIG
-                    if MappingType.APP_CONFIG in app_mapping
-                    else MappingType.ADDON_CONFIG
-                )
-                self._folder_mount(
-                    "app-config",
-                    self.app.path_extern_config.as_posix(),
-                    app_mapping[config_mapping_type].path
-                    or PATH_PUBLIC_CONFIG.as_posix(),
-                    app_mapping[config_mapping_type].read_only,
-                    mounts,
-                    volumes,
-                )
-
-            if MappingType.HOMEASSISTANT_CONFIG in app_mapping:
-                self._folder_mount(
-                    "homeassistant-config",
-                    self.sys_config.path_extern_homeassistant.as_posix(),
-                    app_mapping[MappingType.HOMEASSISTANT_CONFIG].path
-                    or PATH_HOMEASSISTANT_CONFIG.as_posix(),
-                    app_mapping[MappingType.HOMEASSISTANT_CONFIG].read_only,
-                    mounts,
-                    volumes,
-                )
-
-        all_app_configs_mapping_type: MappingType | None = None
-        if MappingType.ALL_APP_CONFIGS in app_mapping:
-            all_app_configs_mapping_type = MappingType.ALL_APP_CONFIGS
-        elif MappingType.ALL_ADDON_CONFIGS in app_mapping:
-            all_app_configs_mapping_type = MappingType.ALL_ADDON_CONFIGS
-
-        if all_app_configs_mapping_type:
-            self._folder_mount(
-                "all-app-configs",
-                self.sys_config.path_extern_app_configs.as_posix(),
-                app_mapping[all_app_configs_mapping_type].path
-                or (
-                    PATH_ALL_APP_CONFIGS.as_posix()
-                    if all_app_configs_mapping_type == MappingType.ALL_APP_CONFIGS
-                    else PATH_ALL_ADDON_CONFIGS.as_posix()
-                ),
-                app_mapping[all_app_configs_mapping_type].read_only,
-                mounts,
-                volumes,
-            )
-
-        if MappingType.SSL in app_mapping:
-            self._folder_mount(
-                "ssl",
-                self.sys_config.path_extern_ssl.as_posix(),
-                app_mapping[MappingType.SSL].path or PATH_SSL.as_posix(),
-                app_mapping[MappingType.SSL].read_only,
-                mounts,
-                volumes,
-            )
-
-        apps_mapping_type: MappingType | None = None
-        if MappingType.LOCAL_APPS in app_mapping:
-            apps_mapping_type = MappingType.LOCAL_APPS
-        elif MappingType.ADDONS in app_mapping:
-            apps_mapping_type = MappingType.ADDONS
-
-        if apps_mapping_type:
-            self._folder_mount(
-                "local-apps",
-                self.sys_config.path_extern_apps_local.as_posix(),
-                app_mapping[apps_mapping_type].path
-                or (
-                    PATH_LOCAL_APPS.as_posix()
-                    if apps_mapping_type == MappingType.LOCAL_APPS
-                    else PATH_LOCAL_ADDONS.as_posix()
-                ),
-                app_mapping[apps_mapping_type].read_only,
-                mounts,
-                volumes,
-            )
-
-        if MappingType.BACKUP in app_mapping:
-            self._folder_mount(
-                "backup",
-                self.sys_config.path_extern_backup.as_posix(),
-                app_mapping[MappingType.BACKUP].path or PATH_BACKUP.as_posix(),
-                app_mapping[MappingType.BACKUP].read_only,
-                mounts,
-                volumes,
-            )
-
-        if MappingType.SHARE in app_mapping:
-            self._folder_mount(
-                "share",
-                self.sys_config.path_extern_share.as_posix(),
-                app_mapping[MappingType.SHARE].path or PATH_SHARE.as_posix(),
-                app_mapping[MappingType.SHARE].read_only,
-                mounts,
-                volumes,
-            )
-
-        if MappingType.MEDIA in app_mapping:
-            self._folder_mount(
-                "media",
-                self.sys_config.path_extern_media.as_posix(),
-                app_mapping[MappingType.MEDIA].path or PATH_MEDIA.as_posix(),
-                app_mapping[MappingType.MEDIA].read_only,
+                mount.name,
+                mount.source,
+                mount.target,
+                mount.read_only,
                 mounts,
                 volumes,
             )
@@ -406,7 +250,7 @@ class K8sApp(K8sInterface):
 
     @Job(
         name="k8s_app_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:

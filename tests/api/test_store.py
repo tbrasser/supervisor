@@ -18,7 +18,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.app import DockerApp
 from supervisor.docker.const import ContainerState
 from supervisor.docker.interface import DockerInterface
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import StoreGitError
 from supervisor.homeassistant.const import WSEvent
 from supervisor.homeassistant.module import HomeAssistant
@@ -228,7 +228,7 @@ async def test_api_store_update_healthcheck(
         await asyncio.sleep(0)
 
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.STOPPED,
                 id="abc123",
@@ -238,7 +238,7 @@ async def test_api_store_update_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.RUNNING,
                 id="abc123",
@@ -248,7 +248,7 @@ async def test_api_store_update_healthcheck(
 
         state_changes.append(install_app_ssh.state)
         await install_app_ssh.container_state_changed(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=f"addon_{TEST_ADDON_SLUG}",
                 state=ContainerState.HEALTHY,
                 id="abc123",

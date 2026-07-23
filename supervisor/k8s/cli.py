@@ -2,11 +2,13 @@
 
 import logging
 
+from awesomeversion import AwesomeVersion
+
 from ..const import CLI_DOCKER_NAME
 from ..docker.const import ENV_TIME, ENV_TOKEN
-from ..exceptions import DockerJobError
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -28,13 +30,13 @@ class K8sCli(K8sInterface):
         return self.sys_plugins.cli.image
 
     @property
-    def version(self) -> str | None:
+    def version(self) -> AwesomeVersion | None:
         """Return version of HA cli image."""
         return self.sys_plugins.cli.version
 
     @Job(
         name="k8s_cli_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:

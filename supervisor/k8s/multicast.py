@@ -2,11 +2,13 @@
 
 import logging
 
+from awesomeversion import AwesomeVersion
+
 from ..docker.const import ENV_TIME
 from ..docker.multicast import MULTICAST_DOCKER_NAME
-from ..exceptions import DockerJobError
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -28,13 +30,13 @@ class K8sMulticast(K8sInterface):
         return self.sys_plugins.multicast.image
 
     @property
-    def version(self) -> str | None:
+    def version(self) -> AwesomeVersion | None:
         """Return version of HA Multicast image."""
         return self.sys_plugins.multicast.version
 
     @Job(
         name="k8s_multicast_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self) -> None:

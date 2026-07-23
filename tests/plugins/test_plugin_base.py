@@ -11,7 +11,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.const import ContainerState
 from supervisor.docker.interface import DockerInterface
 from supervisor.docker.manager import DockerAPI
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import (
     AudioError,
     AudioJobError,
@@ -77,8 +77,8 @@ async def test_plugin_watchdog(coresys: CoreSys, plugin: PluginBase) -> None:
         current_state.return_value = ContainerState.UNHEALTHY
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=plugin.instance.name,
                 state=ContainerState.UNHEALTHY,
                 id="abc123",
@@ -92,8 +92,8 @@ async def test_plugin_watchdog(coresys: CoreSys, plugin: PluginBase) -> None:
         current_state.return_value = ContainerState.FAILED
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=plugin.instance.name,
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -109,8 +109,8 @@ async def test_plugin_watchdog(coresys: CoreSys, plugin: PluginBase) -> None:
         current_state.return_value = ContainerState.STOPPED
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=plugin.instance.name,
                 state=ContainerState.STOPPED,
                 id="abc123",
@@ -124,8 +124,8 @@ async def test_plugin_watchdog(coresys: CoreSys, plugin: PluginBase) -> None:
         current_state.return_value = ContainerState.HEALTHY
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name=plugin.instance.name,
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -139,8 +139,8 @@ async def test_plugin_watchdog(coresys: CoreSys, plugin: PluginBase) -> None:
         # Other containers ignored
         await fire_bus_event(
             coresys,
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE,
-            DockerContainerStateEvent(
+            BusEvent.CONTAINER_STATE_CHANGE,
+            ContainerStateEvent(
                 name="addon_local_other",
                 state=ContainerState.UNHEALTHY,
                 id="abc123",
@@ -182,7 +182,7 @@ async def test_plugin_watchdog_max_failed_attempts(
         patch.object(type(plugin), "start", side_effect=error) as start,
     ):
         await plugin.watchdog_container(
-            DockerContainerStateEvent(
+            ContainerStateEvent(
                 name=plugin.instance.name,
                 state=ContainerState.FAILED,
                 id="abc123",
@@ -223,7 +223,7 @@ async def test_plugin_load_running_container(
     ):
         await plugin.load()
         register_event.assert_any_call(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, plugin.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, plugin.watchdog_container
         )
         attach.assert_called_once_with(
             version=test_version, skip_state_event_if_down=True
@@ -256,7 +256,7 @@ async def test_plugin_load_stopped_container(
     ):
         await plugin.load()
         register_event.assert_any_call(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, plugin.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, plugin.watchdog_container
         )
         attach.assert_called_once_with(
             version=test_version, skip_state_event_if_down=True
@@ -291,7 +291,7 @@ async def test_plugin_load_missing_container(
     ):
         await plugin.load()
         register_event.assert_any_call(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, plugin.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, plugin.watchdog_container
         )
         attach.assert_called_once_with(
             version=test_version, skip_state_event_if_down=True
@@ -334,6 +334,7 @@ async def test_update_fails_if_out_of_date(
 @pytest.mark.usefixtures("coresys")
 async def test_repair_failed(capture_exception: Mock, plugin: PluginBase):
     """Test repair failed."""
+    plugin.version = AwesomeVersion("2022.7.3")
     with (
         patch.object(DockerInterface, "exists", return_value=False),
         patch.object(

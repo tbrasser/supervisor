@@ -19,7 +19,7 @@ from supervisor.coresys import CoreSys
 from supervisor.docker.app import DockerApp
 from supervisor.docker.const import ContainerState
 from supervisor.docker.manager import CommandReturn
-from supervisor.docker.monitor import DockerContainerStateEvent
+from supervisor.docker.monitor import ContainerStateEvent
 from supervisor.exceptions import HassioError
 from supervisor.store.repository import Repository
 
@@ -27,9 +27,9 @@ from ..common import force_app_state
 from ..const import TEST_ADDON_SLUG
 
 
-def _create_test_event(name: str, state: ContainerState) -> DockerContainerStateEvent:
+def _create_test_event(name: str, state: ContainerState) -> ContainerStateEvent:
     """Create a container state event."""
-    return DockerContainerStateEvent(
+    return ContainerStateEvent(
         name=name,
         state=state,
         id="abc123",

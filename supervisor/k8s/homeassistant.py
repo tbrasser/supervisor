@@ -11,6 +11,7 @@ backends.
 
 from __future__ import annotations
 
+from ipaddress import IPv4Address
 import logging
 from typing import Any
 
@@ -28,10 +29,10 @@ from ..docker.const import (
     PATH_SSL,
 )
 from ..docker.manager import CommandReturn
-from ..exceptions import DockerJobError
 from ..homeassistant.const import LANDINGPAGE
 from ..jobs.const import JobConcurrency
 from ..jobs.decorator import Job
+from .exceptions import K8sJobError
 from .interface import K8sInterface
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -63,6 +64,24 @@ class K8sHomeAssistant(K8sInterface):
     def image(self) -> str:
         """Return the Home Assistant container image repository."""
         return self.sys_homeassistant.image
+
+    @property
+    def machine(self) -> str | None:
+        """Return the machine type of the Home Assistant image.
+
+        The machine label is Docker image metadata which is not available
+        from the Kubernetes API.
+        """
+        return None
+
+    @property
+    def ip_address(self) -> IPv4Address:
+        """Return the IP address Home Assistant is reachable on.
+
+        The Pod IP is not tracked on this backend; Supervisor communicates
+        with Home Assistant Core over the Unix socket instead.
+        """
+        return IPv4Address("0.0.0.0")
 
     @property
     def version(self) -> AwesomeVersion | None:
@@ -164,7 +183,7 @@ class K8sHomeAssistant(K8sInterface):
 
     @Job(
         name="k8s_home_assistant_run",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def run(self, *, restore_job_id: str | None = None) -> None:
@@ -220,7 +239,7 @@ class K8sHomeAssistant(K8sInterface):
 
     @Job(
         name="k8s_home_assistant_execute_command",
-        on_condition=DockerJobError,
+        on_condition=K8sJobError,
         concurrency=JobConcurrency.GROUP_REJECT,
     )
     async def execute_command(self, command: list[str]) -> CommandReturn:

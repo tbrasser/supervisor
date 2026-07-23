@@ -20,9 +20,7 @@ from ..const import ATTR_HOMEASSISTANT, BusEvent, CoreState
 from ..coresys import CoreSys
 from ..docker.const import ContainerState
 from ..docker.homeassistant import HASS_DOCKER_NAME, DockerHomeAssistant
-from ..k8s.homeassistant import HASS_K8S_NAME, K8sHomeAssistant
-from ..docker.monitor import DockerContainerStateEvent
-from ..docker.stats import DockerStats
+from ..docker.monitor import ContainerStateEvent
 from ..exceptions import (
     DockerError,
     HomeAssistantCrashError,
@@ -39,7 +37,10 @@ from ..jobs import ChildJobSyncFilter
 from ..jobs.const import JOB_GROUP_HOME_ASSISTANT_CORE, JobConcurrency, JobThrottle
 from ..jobs.decorator import Job, JobCondition
 from ..jobs.job_group import JobGroup
+from ..k8s.homeassistant import K8sHomeAssistant
 from ..resolution.const import ContextType, IssueType
+from ..runtime.interface import HomeAssistantInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.sentry import async_capture_exception
 from .const import (
     LANDINGPAGE,
@@ -80,8 +81,8 @@ class HomeAssistantCore(JobGroup):
     def __init__(self, coresys: CoreSys):
         """Initialize Home Assistant object."""
         super().__init__(coresys, JOB_GROUP_HOME_ASSISTANT_CORE)
-        self.instance: DockerHomeAssistant | K8sHomeAssistant = (
-            K8sHomeAssistant(coresys) if coresys.k8s else DockerHomeAssistant(coresys)
+        self.instance: HomeAssistantInstance = create_instance(
+            coresys, DockerHomeAssistant, K8sHomeAssistant
         )
         self._error_state: bool = False
         self._watchdog_listener: EventListener | None = None
@@ -94,7 +95,7 @@ class HomeAssistantCore(JobGroup):
     async def load(self) -> None:
         """Prepare Home Assistant object."""
         self._watchdog_listener = self.sys_bus.register_event(
-            BusEvent.DOCKER_CONTAINER_STATE_CHANGE, self.watchdog_container
+            BusEvent.CONTAINER_STATE_CHANGE, self.watchdog_container
         )
         self.sys_bus.register_event(
             BusEvent.SUPERVISOR_STATE_CHANGE, self._supervisor_state_changed
@@ -544,7 +545,7 @@ class HomeAssistantCore(JobGroup):
             await self.instance.stop()
         await self.start()
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of Home Assistant."""
         try:
             return await self.instance.stats()
@@ -672,7 +673,7 @@ class HomeAssistantCore(JobGroup):
         except DockerError:
             _LOGGER.error("Repairing of Home Assistant failed")
 
-    async def watchdog_container(self, event: DockerContainerStateEvent) -> None:
+    async def watchdog_container(self, event: ContainerStateEvent) -> None:
         """Process state changes in Home Assistant container and restart if necessary."""
         if not (event.name == self.instance.name and self.sys_homeassistant.watchdog):
             return

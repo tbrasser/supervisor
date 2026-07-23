@@ -12,12 +12,13 @@ from awesomeversion import AwesomeVersion
 from ..const import ATTR_ACCESS_TOKEN
 from ..coresys import CoreSys
 from ..docker.cli import DockerCli
-from ..k8s.cli import K8sCli
 from ..docker.const import ContainerState
-from ..docker.stats import DockerStats
 from ..exceptions import CliError, CliJobError, CliUpdateError, DockerError, PluginError
 from ..jobs.const import JobThrottle
 from ..jobs.decorator import Job
+from ..k8s.cli import K8sCli
+from ..runtime.interface import WorkloadInstance, create_instance
+from ..runtime.stats import ContainerStats
 from ..utils.sentry import async_capture_exception
 from .base import PluginBase
 from .const import (
@@ -39,9 +40,7 @@ class PluginCli(PluginBase):
         super().__init__(FILE_HASSIO_CLI, SCHEMA_CLI_CONFIG)
         self.slug = "cli"
         self.coresys: CoreSys = coresys
-        self.instance: DockerCli | K8sCli = (
-            K8sCli(coresys) if coresys.k8s else DockerCli(coresys)
-        )
+        self.instance: WorkloadInstance = create_instance(coresys, DockerCli, K8sCli)
 
     @property
     def default_image(self) -> str:
@@ -93,7 +92,7 @@ class PluginCli(PluginBase):
         except DockerError as err:
             raise CliError("Can't stop cli plugin", _LOGGER.error) from err
 
-    async def stats(self) -> DockerStats:
+    async def stats(self) -> ContainerStats:
         """Return stats of cli."""
         try:
             return await self.instance.stats()
@@ -112,9 +111,12 @@ class PluginCli(PluginBase):
         if await self.instance.exists():
             return
 
+        if not (version := self.version):
+            return
+
         _LOGGER.info("Repairing HA cli %s", self.version)
         try:
-            await self.instance.install(self.version)
+            await self.instance.install(version)
         except DockerError as err:
             _LOGGER.error("Repair of HA cli failed")
             await async_capture_exception(err)

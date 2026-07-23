@@ -351,8 +351,8 @@ class DockerApp(DockerInterface):
         return None
 
     @property
-    def mounts(self) -> list[DockerMount]:
-        """Return mounts for container."""
+    def folder_mounts(self) -> list[DockerMount]:
+        """Return folder mounts for container from the app mappings."""
         app_mapping = self.app.map_volumes
 
         target_data_path: str | None = None
@@ -360,7 +360,6 @@ class DockerApp(DockerInterface):
             target_data_path = app_mapping[MappingType.DATA].path
 
         mounts = [
-            MOUNT_DEV,
             DockerMount(
                 type=MountType.BIND,
                 source=self.app.path_extern_data.as_posix(),
@@ -497,6 +496,13 @@ class DockerApp(DockerInterface):
                     bind_options=MountBindOptions(propagation=PropagationMode.RSLAVE),
                 )
             )
+
+        return mounts
+
+    @property
+    def mounts(self) -> list[DockerMount]:
+        """Return mounts for container."""
+        mounts = [MOUNT_DEV, *self.folder_mounts]
 
         # Init other hardware mappings
 
