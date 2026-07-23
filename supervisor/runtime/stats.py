@@ -14,7 +14,11 @@ from typing import Protocol
 
 
 class ContainerStats(Protocol):
-    """Structural interface for normalized container resource usage stats."""
+    """Structural interface for normalized container resource usage stats.
+
+    Implementations (e.g. ``DockerStats``, ``K8sStats``) satisfy this
+    protocol structurally and do not inherit from it.
+    """
 
     @property
     def cpu_percent(self) -> float:

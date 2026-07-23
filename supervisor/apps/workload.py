@@ -38,7 +38,12 @@ class WorkloadMount:
 
 
 def _mount_name(target: str) -> str:
-    """Derive a DNS-1123 compatible volume name from the mount target."""
+    """Derive a DNS-1123 compatible volume name from the mount target.
+
+    The name is truncated to the Kubernetes 63-character limit; a trailing
+    dash left over from truncation is stripped, so the result may be
+    slightly shorter.
+    """
     name = _NAME_SANITIZE_RE.sub("-", target.lower()).strip("-")
     return name[:63].strip("-") or "root"
 
